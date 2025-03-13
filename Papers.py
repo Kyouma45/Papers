@@ -2,10 +2,14 @@ import streamlit as st
 import pandas as pd
 import json
 import os
-import re  # Added the missing import
-from datetime import datetime
+import re
+from datetime import datetime, timedelta
 import random
 import arxiv
+import plotly.express as px
+import plotly.graph_objects as go
+import numpy as np
+from collections import Counter
 
 PAPER_FILE = "paper_with_topics.json"
 READING_QUOTES = [
@@ -283,6 +287,245 @@ def create_progress_bar(current, total, title):
     st.progress(progress, text=f"{title}: {current}/{total}")
 
 
+def analyze_reading_habits(paper_df):
+    """Generate analysis metrics for reading habits."""
+    if paper_df.empty:
+        return {
+            "total_papers": 0,
+            "read_papers": 0,
+            "reading_papers": 0,
+            "want_to_read_papers": 0,
+            "reading_velocity": 0,
+            "avg_reading_time": 0,
+            "topic_distribution": {},
+            "monthly_activity": {},
+            "completion_rate": 0,
+            "recent_topics": []
+        }
+
+    # Ensure date format is consistent
+    paper_df['Date Added'] = pd.to_datetime(paper_df['Date Added'], errors='coerce')
+
+    # Basic counts
+    total_papers = len(paper_df)
+    read_papers = len(paper_df[paper_df['Reading Status'] == 'Read'])
+    reading_papers = len(paper_df[paper_df['Reading Status'] == 'Reading'])
+    want_to_read_papers = len(paper_df[paper_df['Reading Status'] == 'Want to Read'])
+
+    # Reading velocity (papers per month)
+    if total_papers > 0:
+        earliest_date = paper_df['Date Added'].min()
+        latest_date = paper_df['Date Added'].max()
+
+        # Calculate months between earliest and latest dates
+        if pd.notnull(earliest_date) and pd.notnull(latest_date):
+            months_diff = (latest_date.year - earliest_date.year) * 12 + (latest_date.month - earliest_date.month)
+            months_diff = max(1, months_diff)  # Avoid division by zero
+            reading_velocity = total_papers / months_diff
+        else:
+            reading_velocity = 0
+    else:
+        reading_velocity = 0
+
+    # Average estimated reading time (assuming 1 paper takes 2 days to read)
+    avg_reading_time = 2  # days per paper
+
+    # Topic distribution
+    topic_counts = Counter()
+    for topics in paper_df['Topics']:
+        if isinstance(topics, list):
+            for topic in topics:
+                topic_counts[topic] += 1
+
+    # Sort topics by frequency
+    topic_distribution = dict(topic_counts.most_common())
+
+    # Monthly activity
+    paper_df['Month'] = paper_df['Date Added'].dt.strftime('%Y-%m')
+    monthly_activity = paper_df.groupby('Month').size().to_dict()
+
+    # Completion rate
+    completion_rate = (read_papers / total_papers * 100) if total_papers > 0 else 0
+
+    # Recent trends in topics (last 3 months)
+    three_months_ago = datetime.now() - timedelta(days=90)
+    recent_papers = paper_df[paper_df['Date Added'] >= three_months_ago]
+    recent_topic_counts = Counter()
+
+    for topics in recent_papers['Topics']:
+        if isinstance(topics, list):
+            for topic in topics:
+                recent_topic_counts[topic] += 1
+
+    recent_topics = [topic for topic, _ in recent_topic_counts.most_common(5)]
+
+    return {
+        "total_papers": total_papers,
+        "read_papers": read_papers,
+        "reading_papers": reading_papers,
+        "want_to_read_papers": want_to_read_papers,
+        "reading_velocity": round(reading_velocity, 2),
+        "avg_reading_time": avg_reading_time,
+        "topic_distribution": topic_distribution,
+        "monthly_activity": monthly_activity,
+        "completion_rate": round(completion_rate, 1),
+        "recent_topics": recent_topics
+    }
+
+
+def create_reading_timeline(paper_df):
+    """Create a timeline visualization of papers added over time."""
+    if paper_df.empty:
+        return None
+
+    # Ensure date is in datetime format
+    paper_df['Date Added'] = pd.to_datetime(paper_df['Date Added'], errors='coerce')
+
+    # Create a copy with only valid dates
+    df_valid = paper_df.dropna(subset=['Date Added'])
+
+    if df_valid.empty:
+        return None
+
+    # Sort by date
+    df_valid = df_valid.sort_values('Date Added')
+
+    # Create timeline
+    fig = px.scatter(
+        df_valid,
+        x='Date Added',
+        y=[1] * len(df_valid),  # All papers at same level
+        color='Reading Status',
+        hover_name='Title',
+        size=[10] * len(df_valid),  # Consistent dot size
+        color_discrete_map={
+            'Read': '#4CAF50',  # Green
+            'Reading': '#FFC107',  # Amber
+            'Want to Read': '#2196F3'  # Blue
+        },
+        title="Paper Reading Timeline",
+        labels={'Reading Status': 'Status'}
+    )
+
+    # Improve layout
+    fig.update_layout(
+        yaxis_title="",
+        yaxis_showticklabels=False,
+        yaxis_showgrid=False,
+        height=300,
+        hovermode="closest"
+    )
+
+    return fig
+
+
+def create_topic_network(paper_df):
+    """Create a network visualization of related topics."""
+    if paper_df.empty:
+        return None
+
+    # Extract all unique topics
+    all_topics = set()
+    for topics in paper_df['Topics']:
+        if isinstance(topics, list):
+            all_topics.update(topics)
+
+    if not all_topics:
+        return None
+
+    # Count co-occurrences of topics
+    topic_pairs = []
+    for topics in paper_df['Topics']:
+        if isinstance(topics, list) and len(topics) > 1:
+            for i, topic1 in enumerate(topics):
+                for topic2 in topics[i + 1:]:
+                    topic_pairs.append((topic1, topic2))
+
+    # Count frequency of pairs
+    pair_counts = Counter(topic_pairs)
+
+    # Create nodes for each topic
+    nodes = list(all_topics)
+    node_sizes = []
+
+    for topic in nodes:
+        # Count papers with this topic
+        count = sum(1 for topics in paper_df['Topics'] if isinstance(topics, list) and topic in topics)
+        node_sizes.append(count * 10)  # Scale node size
+
+    # Create edges between topics that co-occur
+    edge_x = []
+    edge_y = []
+    edge_weights = []
+
+    # Simple circular layout for nodes
+    node_positions = {}
+    n = len(nodes)
+    for i, node in enumerate(nodes):
+        angle = 2 * np.pi * i / n
+        node_positions[node] = (np.cos(angle), np.sin(angle))
+
+    for (topic1, topic2), count in pair_counts.items():
+        if count > 0:  # Only include edges with connections
+            x0, y0 = node_positions[topic1]
+            x1, y1 = node_positions[topic2]
+            edge_x.extend([x0, x1, None])
+            edge_y.extend([y0, y1, None])
+            edge_weights.append(count)
+
+    # Create edge trace
+    edge_trace = go.Scatter(
+        x=edge_x, y=edge_y,
+        line=dict(width=1, color='#888'),
+        hoverinfo='none',
+        mode='lines')
+
+    # Create node trace
+    node_x = [pos[0] for pos in node_positions.values()]
+    node_y = [pos[1] for pos in node_positions.values()]
+
+    node_trace = go.Scatter(
+        x=node_x, y=node_y,
+        mode='markers+text',
+        hoverinfo='text',
+        text=nodes,
+        textposition="top center",
+        marker=dict(
+            showscale=True,
+            colorscale='Viridis',
+            size=node_sizes,
+            colorbar=dict(
+                thickness=15,
+                title='Paper Count',
+                xanchor='left',
+                titleside='right'
+            ),
+            line_width=2))
+
+    # Color nodes by frequency
+    node_adjacencies = []
+    for node in nodes:
+        count = sum(1 for topics in paper_df['Topics'] if isinstance(topics, list) and node in topics)
+        node_adjacencies.append(count)
+
+    node_trace.marker.color = node_adjacencies
+
+    # Create figure
+    fig = go.Figure(data=[edge_trace, node_trace],
+                    layout=go.Layout(
+                        title='Topic Relationship Network',
+                        titlefont_size=16,
+                        showlegend=False,
+                        hovermode='closest',
+                        margin=dict(b=20, l=5, r=5, t=40),
+                        xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+                        height=500
+                    ))
+
+    return fig
+
+
 def main():
     # Set page config with a fun emoji and custom theme
     st.set_page_config(
@@ -342,7 +585,7 @@ def main():
     if 'success_message' not in st.session_state:
         st.session_state.success_message = None
 
-    tab1, tab2, tab3 = st.tabs(["➕ Add Paper", "📋 View Collection", "🔍 Search & Edit"])
+    tab1, tab2, tab3, tab4 = st.tabs(["➕ Add Paper", "📋 View Collection", "🔍 Search & Edit", "📊 Analysis"])
 
     with tab1:
         # Display success message if exists
@@ -354,7 +597,6 @@ def main():
         # Create a separate form for the fetch functionality
         with st.form(key="fetch_form"):
             url_col1, url_col2 = st.columns([3, 1])
-
             with url_col1:
                 arxiv_url = st.text_input(
                     "ArXiv URL",
@@ -434,48 +676,201 @@ def main():
     with tab2:
         st.markdown("### 📚 Your Paper Collection")
 
-        # Enhanced filters
-        col1, col2, col3 = st.columns([1, 1, 1])
-        with col1:
-            all_topics = set(topic for topics_list in st.session_state.paper['Topics'] for topic in topics_list if
-                             isinstance(topics_list, list))
-            topic_filter = st.multiselect("🏷️ Filter by Topics", options=sorted(list(all_topics)))
+        # Enhanced filters section
+        with st.expander("🔍 Advanced Filters", expanded=True):
+            filter_col1, filter_col2 = st.columns([1, 1])
 
-        with col2:
-            status_filter = st.radio("📖 Reading Status", ["All", "Want to Read", "Reading", "Read"], horizontal=True)
+            with filter_col1:
+                # Topic filter with select all option
+                all_topics = set(topic for topics_list in st.session_state.paper['Topics'] for topic in topics_list if
+                                 isinstance(topics_list, list))
+                topic_filter = st.multiselect("🏷️ Filter by Topics", options=["All"] + sorted(list(all_topics)))
 
-        with col3:
-            sort_by = st.selectbox("🔄 Sort by", ["Date Added", "Title"])
+                # Date range filter
+                if not st.session_state.paper.empty and 'Date Added' in st.session_state.paper.columns:
+                    min_date = pd.to_datetime(st.session_state.paper['Date Added']).min()
+                    max_date = pd.to_datetime(st.session_state.paper['Date Added']).max()
 
+                    if pd.notna(min_date) and pd.notna(max_date):
+                        date_range = st.date_input(
+                            "📅 Date Range",
+                            value=(min_date.date(), max_date.date()),
+                            min_value=min_date.date(),
+                            max_value=max_date.date()
+                        )
+                    else:
+                        date_range = None
+                else:
+                    date_range = None
+
+            with filter_col2:
+                # Reading status filter with multiselect
+                status_options = ["Want to Read", "Reading", "Read"]
+                status_filter = st.multiselect("📖 Reading Status",
+                                               options=["All"] + status_options,
+                                               default=["All"])
+
+                # Text search filter
+                text_filter = st.text_input("🔍 Search in Title/Description",
+                                            placeholder="Enter keywords...")
+
+        # View and sorting options
+        view_col1, view_col2, view_col3 = st.columns([1, 1, 1])
+
+        with view_col1:
+            view_type = st.radio("👁️ View Type", ["Cards", "Compact List", "Detailed Table"], horizontal=True)
+
+        with view_col2:
+            sort_by = st.selectbox("🔄 Sort by", ["Date Added", "Title", "Reading Status", "Topics Count"])
+
+        with view_col3:
+            sort_direction = st.radio("⬆️⬇️ Order", ["Descending", "Ascending"], horizontal=True)
+
+        # Apply filters
         papers_to_display = st.session_state.paper.copy()
 
-        # Apply filters and sorting
-        if status_filter != "All":
-            papers_to_display = papers_to_display[papers_to_display['Reading Status'] == status_filter]
+        # Apply status filter
+        if status_filter and "All" not in status_filter:
+            papers_to_display = papers_to_display[papers_to_display['Reading Status'].isin(status_filter)]
 
-        if topic_filter:
+        # Apply topic filter
+        if topic_filter and "All" not in topic_filter:
             papers_to_display = papers_to_display[
                 papers_to_display['Topics'].apply(lambda x: any(topic in x for topic in topic_filter))
             ]
 
+        # Apply date range filter
+        if date_range and len(date_range) == 2:
+            papers_to_display['Date Added'] = pd.to_datetime(papers_to_display['Date Added'])
+            start_date, end_date = date_range
+            papers_to_display = papers_to_display[
+                (papers_to_display['Date Added'].dt.date >= start_date) &
+                (papers_to_display['Date Added'].dt.date <= end_date)
+                ]
+
+        # Apply text search filter
+        if text_filter:
+            papers_to_display = papers_to_display[
+                papers_to_display['Title'].str.contains(text_filter, case=False, na=False) |
+                papers_to_display['Description'].str.contains(text_filter, case=False, na=False)
+                ]
+
+        # Add topics count for sorting
+        papers_to_display['Topics Count'] = papers_to_display['Topics'].apply(
+            lambda x: len(x) if isinstance(x, list) else 0
+        )
+
+        # Apply sorting
+        ascending = sort_direction == "Ascending"
         if sort_by == "Date Added":
-            papers_to_display = papers_to_display.sort_values('Date Added', ascending=False)
+            papers_to_display['Date Added'] = pd.to_datetime(papers_to_display['Date Added'])
+            papers_to_display = papers_to_display.sort_values('Date Added', ascending=ascending)
+        elif sort_by == "Title":
+            papers_to_display = papers_to_display.sort_values('Title', ascending=ascending)
+        elif sort_by == "Reading Status":
+            # Custom sort order for Reading Status
+            status_order = {"Read": 0, "Reading": 1, "Want to Read": 2}
+            if ascending:
+                status_order = {k: -v for k, v in status_order.items()}
+            papers_to_display['Status Order'] = papers_to_display['Reading Status'].map(status_order)
+            papers_to_display = papers_to_display.sort_values('Status Order', ascending=True)
+        elif sort_by == "Topics Count":
+            papers_to_display = papers_to_display.sort_values('Topics Count', ascending=ascending)
+
+        # Display count of filtered papers
+        st.markdown(f"**Showing {len(papers_to_display)} papers**")
+
+        if papers_to_display.empty:
+            st.info("No papers match your filter criteria.")
         else:
-            papers_to_display = papers_to_display.sort_values('Title')
+            # Display papers based on view type
+            if view_type == "Cards":
+                # Card view - grid layout
+                paper_rows = [papers_to_display.iloc[i:i + 3] for i in range(0, len(papers_to_display), 3)]
 
-        # Display papers with formatted date
-        for _, paper in papers_to_display.iterrows():
-            with st.expander(f"📑 {paper['Title']}", expanded=False):
+                for row in paper_rows:
+                    cols = st.columns(3)
+                    for i, (_, paper) in enumerate(row.iterrows()):
+                        with cols[i]:
+                            status_color = {
+                                "Want to Read": "blue",
+                                "Reading": "orange",
+                                "Read": "green"
+                            }.get(paper['Reading Status'], "gray")
+
+                            st.markdown(f"""
+                            <div style="border:1px solid #ddd; border-radius:5px; padding:10px; margin:5px; height:200px; overflow:auto">
+                                <h4>{paper['Title']}</h4>
+                                <p><span style="color:{status_color}">●</span> {paper['Reading Status']}</p>
+                                <p><small>Added: {pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')}</small></p>
+                                <p>Topics: {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''}</p>
+                            </div>
+                            """, unsafe_allow_html=True)
+
+                            if paper['Link']:
+                                st.markdown(f"[Open Paper]({paper['Link']})")
+
+            elif view_type == "Compact List":
+                # Compact list view
+                for _, paper in papers_to_display.iterrows():
+                    status_emoji = {
+                        "Want to Read": "🔹",
+                        "Reading": "🔶",
+                        "Read": "✅"
+                    }.get(paper['Reading Status'], "📄")
+
+                    st.markdown(
+                        f"{status_emoji} **{paper['Title']}** - {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''} *(Added: {pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')})*")
+
+                    col1, col2 = st.columns([1, 10])
+                    with col1:
+                        pass
+                    with col2:
+                        if paper['Link']:
+                            st.markdown(f"[Open Paper]({paper['Link']})")
+
+                    st.markdown("---")
+
+            else:  # Detailed Table view
+                # Convert to a format suitable for display
+                display_df = papers_to_display.copy()
+                display_df['Topics'] = display_df['Topics'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '')
+                display_df['Date Added'] = pd.to_datetime(display_df['Date Added']).dt.strftime('%Y-%m-%d')
+
+                # Reorder and select columns for display
+                display_df = display_df[['Title', 'Reading Status', 'Date Added', 'Topics']]
+
+                # Show as table
+                st.dataframe(
+                    display_df,
+                    column_config={
+                        "Title": st.column_config.TextColumn("Title"),
+                        "Reading Status": st.column_config.TextColumn("Status"),
+                        "Date Added": st.column_config.TextColumn("Added On"),
+                        "Topics": st.column_config.TextColumn("Topics")
+                    },
+                    use_container_width=True,
+                    hide_index=True
+                )
+
+        # Paper details section
+        if len(papers_to_display) > 0:
+            st.markdown("### 📑 Paper Details")
+            paper_titles = ["Select a paper to view details"] + list(papers_to_display['Title'].values)
+            selected_paper = st.selectbox("View paper details", options=paper_titles)
+
+            if selected_paper != "Select a paper to view details":
+                paper = papers_to_display[papers_to_display['Title'] == selected_paper].iloc[0]
+
                 col1, col2 = st.columns([1, 2])
-
                 with col1:
                     st.markdown(f"**Status:** {paper['Reading Status']}")
-                    # Format the date to show only YYYY-MM-DD
                     date_str = pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')
                     st.markdown(f"**Added:** {date_str}")
                     if paper['Link']:
                         st.markdown(f"[Open Paper]({paper['Link']})")
-                    st.markdown(f"**Topics:** {', '.join(paper['Topics'])}")
+                    st.markdown(
+                        f"**Topics:** {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''}")
 
                 with col2:
                     if paper['Description']:
@@ -540,6 +935,253 @@ def main():
                                 save_paper(st.session_state.paper)
                                 st.success("✨ Changes saved successfully!")
                                 st.rerun()
+
+    with tab4:
+        st.markdown("### 📊 Research Analysis Dashboard")
+
+        # Get analysis data
+        analysis_data = analyze_reading_habits(st.session_state.paper)
+
+        # Display summary metrics in a more academic context
+        st.subheader("📈 Research Metrics Overview")
+        col1, col2, col3, col4 = st.columns(4)
+        with col1:
+            st.metric("Research Corpus", analysis_data["total_papers"])
+        with col2:
+            st.metric("Completion Rate", f"{analysis_data['completion_rate']}%")
+        with col3:
+            st.metric("Research Velocity", f"{analysis_data['reading_velocity']} papers/month")
+        with col4:
+            if analysis_data["read_papers"] > 0:
+                time_to_insights = f"{(analysis_data['avg_reading_time'] * analysis_data['total_papers']) / analysis_data['read_papers']:.1f} days"
+            else:
+                time_to_insights = "N/A"
+            st.metric("Time to Insights", time_to_insights)
+
+        # Research progress tracking
+        st.subheader("📚 Research Progress")
+        progress_cols = st.columns(3)
+        with progress_cols[0]:
+            st.markdown("##### Papers by Status")
+            status_labels = ["Read", "Reading", "Want to Read"]
+            status_values = [analysis_data["read_papers"], analysis_data["reading_papers"],
+                             analysis_data["want_to_read_papers"]]
+            status_fig = px.pie(names=status_labels, values=status_values,
+                                color=status_labels,
+                                color_discrete_map={'Read': '#4CAF50', 'Reading': '#FFC107', 'Want to Read': '#2196F3'},
+                                hole=0.4)
+            status_fig.update_layout(margin=dict(t=0, b=0, l=0, r=0), height=250)
+            st.plotly_chart(status_fig, use_container_width=True)
+
+        with progress_cols[1]:
+            st.markdown("##### Research Exploration vs. Focus")
+            if analysis_data["total_papers"] > 0:
+                topics_per_paper = sum(
+                    len(topics) for topics in st.session_state.paper['Topics'] if isinstance(topics, list)) / \
+                                   analysis_data["total_papers"]
+                unique_topics = len(analysis_data["topic_distribution"])
+                topic_breadth = min(unique_topics / max(1, analysis_data["total_papers"]) * 100, 100)
+                topic_depth = min(analysis_data["read_papers"] / max(1, analysis_data["total_papers"]) * 100, 100)
+
+                metrics_data = pd.DataFrame({
+                    'Metric': ['Topics per Paper', 'Unique Research Areas', 'Research Breadth', 'Research Depth'],
+                    'Value': [f"{topics_per_paper:.1f}", unique_topics, f"{topic_breadth:.1f}%", f"{topic_depth:.1f}%"]
+                })
+                st.dataframe(metrics_data, hide_index=True, use_container_width=True)
+            else:
+                st.info("Add papers to see research focus metrics")
+
+        with progress_cols[2]:
+            st.markdown("##### Research Momentum")
+            if analysis_data["monthly_activity"]:
+                last_three_months = sorted(analysis_data["monthly_activity"].items())[-3:]
+                if len(last_three_months) == 3:
+                    momentum = ((last_three_months[2][1] - last_three_months[0][1]) /
+                                max(1, last_three_months[0][1])) * 100
+                    momentum_text = f"{momentum:.1f}% change over 3 months"
+                else:
+                    momentum_text = "Insufficient data"
+
+                recent_activity = pd.DataFrame({
+                    'Month': [m[0] for m in last_three_months],
+                    'Papers': [m[1] for m in last_three_months]
+                })
+                st.dataframe(recent_activity, hide_index=True, use_container_width=True)
+                st.markdown(f"**Research Momentum:** {momentum_text}")
+            else:
+                st.info("Add more papers to track research momentum")
+
+        # Display citation network and paper relationships
+        st.subheader("🔬 Research Knowledge Graph")
+        knowledge_cols = st.columns([2, 1])
+        with knowledge_cols[0]:
+            # Topic network visualization with improved academic context
+            network_fig = create_topic_network(st.session_state.paper)
+            if network_fig:
+                network_fig.update_layout(title="Research Domain Relationship Network")
+                st.plotly_chart(network_fig, use_container_width=True)
+            else:
+                st.info("Add more papers with multiple topics to visualize your research domain network")
+
+        with knowledge_cols[1]:
+            # Research domain statistics
+            if analysis_data["topic_distribution"]:
+                st.markdown("##### Top Research Areas")
+                top_topics = dict(sorted(analysis_data["topic_distribution"].items(),
+                                         key=lambda x: x[1], reverse=True)[:5])
+
+                topic_strength = pd.DataFrame({
+                    'Domain': list(top_topics.keys()),
+                    'Papers': list(top_topics.values()),
+                    'Expertise': [f"{(count / analysis_data['total_papers'] * 100):.1f}%"
+                                  for count in top_topics.values()]
+                })
+                st.dataframe(topic_strength, hide_index=True, use_container_width=True)
+
+                # Research diversity index calculation
+                if len(analysis_data["topic_distribution"]) > 1:
+                    total = sum(analysis_data["topic_distribution"].values())
+                    diversity = -sum((count / total) * np.log(count / total)
+                                     for count in analysis_data["topic_distribution"].values())
+                    normalized_diversity = diversity / np.log(len(analysis_data["topic_distribution"]))
+                    st.metric("Research Diversity Index", f"{normalized_diversity:.2f}")
+                else:
+                    st.metric("Research Diversity Index", "N/A")
+            else:
+                st.info("Add topics to your papers to analyze research domains")
+
+        # Timeline with academic context
+        st.subheader("📅 Research Timeline & Evolution")
+
+        # Research evolution over time
+        timeline_fig = create_reading_timeline(st.session_state.paper)
+        if timeline_fig:
+            timeline_fig.update_layout(title="Research Paper Timeline")
+            st.plotly_chart(timeline_fig, use_container_width=True)
+        else:
+            st.info("Add more papers with dates to visualize your research timeline")
+
+        # Monthly activity with trend analysis
+        if analysis_data["monthly_activity"] and len(analysis_data["monthly_activity"]) > 2:
+            monthly_cols = st.columns([3, 1])
+            with monthly_cols[0]:
+                months = list(analysis_data["monthly_activity"].keys())
+                counts = list(analysis_data["monthly_activity"].values())
+
+                monthly_df = pd.DataFrame({
+                    'Month': months,
+                    'Papers Added': counts
+                })
+                monthly_df['Month'] = pd.to_datetime(monthly_df['Month'])
+                monthly_df = monthly_df.sort_values('Month')
+
+                # Add trendline
+                fig = px.scatter(monthly_df, x='Month', y='Papers Added',
+                                 trendline="rolling", trendline_options=dict(window=3),
+                                 title="Research Intensity by Month")
+                fig.update_traces(marker=dict(size=10))
+                st.plotly_chart(fig, use_container_width=True)
+
+            with monthly_cols[1]:
+                st.markdown("##### Research Cycles")
+                # Calculate moving average
+                if len(monthly_df) >= 3:
+                    monthly_df['Rolling Avg'] = monthly_df['Papers Added'].rolling(window=3).mean()
+                    monthly_df = monthly_df.dropna()
+
+                    # Calculate variance to identify consistency
+                    variance = monthly_df['Papers Added'].var()
+                    avg = monthly_df['Papers Added'].mean()
+                    cov = (np.sqrt(variance) / avg) * 100 if avg > 0 else 0
+
+                    cycle_metrics = pd.DataFrame({
+                        'Metric': ['Average Monthly Papers', 'Research Consistency', 'Peak Research Month'],
+                        'Value': [
+                            f"{avg:.1f}",
+                            f"{100 - min(cov, 100):.0f}% (lower variance = more consistent)",
+                            monthly_df.loc[monthly_df['Papers Added'].idxmax(), 'Month'].strftime('%b %Y')
+                        ]
+                    })
+                    st.dataframe(cycle_metrics, hide_index=True, use_container_width=True)
+                else:
+                    st.info("More data needed for cycle analysis")
+        else:
+            st.info("Add more papers over time to see research activity patterns")
+
+        # Research insights and recommendations
+        st.subheader("🧠 Research Insights & Recommendations")
+        insight_cols = st.columns(2)
+
+        with insight_cols[0]:
+            st.markdown("##### Current Research Patterns")
+
+            # Generate insights based on the data
+            insights = []
+
+            if analysis_data["total_papers"] > 0:
+                # Topic concentration
+                top_topic = max(analysis_data["topic_distribution"].items(), key=lambda x: x[1])[0] if analysis_data[
+                    "topic_distribution"] else "None"
+                top_topic_percent = (
+                            max(analysis_data["topic_distribution"].values()) / analysis_data["total_papers"] * 100) if \
+                analysis_data["topic_distribution"] else 0
+
+                if top_topic_percent > 50:
+                    insights.append(f"Strong focus on '{top_topic}' ({top_topic_percent:.1f}% of papers)")
+                elif top_topic_percent > 30:
+                    insights.append(f"Moderate specialization in '{top_topic}' ({top_topic_percent:.1f}% of papers)")
+
+                # Reading completion
+                completion_rate = analysis_data["completion_rate"]
+                if completion_rate < 30:
+                    insights.append(
+                        f"Low completion rate ({completion_rate:.1f}%) - consider focusing on current papers")
+                elif completion_rate > 70:
+                    insights.append(
+                        f"High completion rate ({completion_rate:.1f}%) - good follow-through on selected papers")
+
+                # Reading velocity
+                if analysis_data["reading_velocity"] < 1:
+                    insights.append(
+                        f"Reading pace ({analysis_data['reading_velocity']:.1f} papers/month) suggests deep analysis")
+                elif analysis_data["reading_velocity"] > 5:
+                    insights.append(
+                        f"High reading velocity ({analysis_data['reading_velocity']:.1f} papers/month) indicates survey research")
+
+            if not insights:
+                insights = ["Add more papers to generate research insights"]
+
+            for i, insight in enumerate(insights):
+                st.markdown(f"**{i + 1}.** {insight}")
+
+        with insight_cols[1]:
+            st.markdown("##### Research Recommendations")
+
+            # Generate recommendations based on the analysis
+            recommendations = []
+
+            if analysis_data["total_papers"] > 0:
+                # Topic exploration
+                if len(analysis_data["topic_distribution"]) < 3 and analysis_data["total_papers"] > 5:
+                    recommendations.append("Consider exploring more diverse research areas")
+
+                # Reading focus
+                if analysis_data["want_to_read_papers"] > analysis_data["read_papers"] * 2:
+                    recommendations.append("Focus on reading existing papers before adding more")
+
+                # Recent topics
+                if analysis_data["recent_topics"]:
+                    recommendations.append(f"Recent focus on: {', '.join(analysis_data['recent_topics'][:3])}")
+
+                # Topic connections
+                if len(analysis_data["topic_distribution"]) > 3:
+                    recommendations.append("Look for interdisciplinary connections between your research domains")
+
+            if not recommendations:
+                recommendations = ["Add more papers to receive research recommendations"]
+
+            for i, recommendation in enumerate(recommendations):
+                st.markdown(f"**{i + 1}.** {recommendation}")
 
 if __name__ == "__main__":
     main()
