@@ -111,6 +111,402 @@ def fetch_paper_details(arxiv_url):
         return None, f"Error fetching paper details: {str(e)}"
 
 
+def create_topic_evolution(paper_df):
+    """Create a visualization showing how topics evolve over time."""
+    if paper_df.empty or len(paper_df) < 3:
+        return None
+
+    # Ensure date is in datetime format
+    paper_df['Date Added'] = pd.to_datetime(paper_df['Date Added'], errors='coerce')
+
+    # Get all unique topics
+    all_topics = set()
+    for topics in paper_df['Topics']:
+        if isinstance(topics, list):
+            all_topics.update(topics)
+
+    # Get top 5 topics
+    topic_counts = Counter()
+    for topics in paper_df['Topics']:
+        if isinstance(topics, list):
+            for topic in topics:
+                topic_counts[topic] += 1
+
+    top_topics = [topic for topic, count in topic_counts.most_common(5)]
+
+    # Create time series data for each topic
+    topic_time_series = {}
+
+    # Group papers by month
+    paper_df['Month'] = paper_df['Date Added'].dt.strftime('%Y-%m')
+    monthly_papers = paper_df.groupby('Month')
+
+    # For each month, count papers with each topic
+    for month, group in monthly_papers:
+        for topic in top_topics:
+            if topic not in topic_time_series:
+                topic_time_series[topic] = []
+
+            # Count papers with this topic in this month
+            count = sum(1 for topics in group['Topics'] if isinstance(topics, list) and topic in topics)
+            topic_time_series[topic].append((month, count))
+
+    # Convert to DataFrame suitable for plotting
+    plot_data = []
+    for topic, time_series in topic_time_series.items():
+        for month, count in time_series:
+            plot_data.append({
+                'Month': month,
+                'Topic': topic,
+                'Count': count
+            })
+
+    if not plot_data:
+        return None
+
+    df = pd.DataFrame(plot_data)
+    df['Month'] = pd.to_datetime(df['Month'])
+    df = df.sort_values('Month')
+
+    fig = px.line(df, x='Month', y='Count', color='Topic',
+                  title="Topic Evolution Over Time",
+                  labels={'Count': 'Papers Count', 'Month': 'Time Period'})
+
+    fig.update_layout(
+        xaxis_title="Time",
+        yaxis_title="Number of Papers",
+        legend_title="Research Topics",
+        height=400
+    )
+
+    return fig
+
+
+def calculate_research_impact_metrics(paper_df):
+    """Calculate metrics that indicate research impact and efficiency."""
+    if paper_df.empty:
+        return {
+            "knowledge_breadth": 0,
+            "knowledge_depth": 0,
+            "research_efficiency": 0,
+            "topic_concentration": 0,
+            "reading_consistency": 0,
+            "exploration_vs_exploitation": 0,
+            "research_velocity_trend": "stable"
+        }
+
+    # Count unique topics and their frequency
+    topic_counts = Counter()
+    for topics in paper_df['Topics']:
+        if isinstance(topics, list):
+            for topic in topics:
+                topic_counts[topic] += 1
+
+    total_papers = len(paper_df)
+    unique_topics = len(topic_counts)
+
+    # Calculate breadth (number of unique topics per paper)
+    knowledge_breadth = unique_topics / max(1, total_papers)
+
+    # Calculate depth (papers per topic)
+    knowledge_depth = sum(topic_counts.values()) / max(1, unique_topics)
+
+    # Calculate reading efficiency
+    read_papers = len(paper_df[paper_df['Reading Status'] == 'Read'])
+    reading_efficiency = read_papers / max(1, total_papers)
+
+    # Calculate topic concentration (how concentrated on top topics)
+    if topic_counts:
+        top_topic_count = topic_counts.most_common(1)[0][1]
+        topic_concentration = top_topic_count / max(1, sum(topic_counts.values()))
+    else:
+        topic_concentration = 0
+
+    # Calculate reading consistency
+    paper_df['Date Added'] = pd.to_datetime(paper_df['Date Added'], errors='coerce')
+    paper_df['Month'] = paper_df['Date Added'].dt.strftime('%Y-%m')
+    monthly_counts = paper_df.groupby('Month').size()
+
+    if len(monthly_counts) > 1:
+        reading_consistency = 1 - (monthly_counts.std() / monthly_counts.mean() if monthly_counts.mean() > 0 else 0)
+        reading_consistency = max(0, min(1, reading_consistency))  # Ensure between 0 and 1
+    else:
+        reading_consistency = 0
+
+    # Calculate exploration vs exploitation
+    # (ratio of new topics to papers in existing topics)
+    if len(paper_df) > 5:
+        recent_papers = paper_df.sort_values('Date Added').tail(5)
+        old_papers = paper_df.sort_values('Date Added').head(len(paper_df) - 5)
+
+        old_topics = set()
+        for topics in old_papers['Topics']:
+            if isinstance(topics, list):
+                old_topics.update(topics)
+
+        new_topic_count = 0
+        existing_topic_count = 0
+
+        for topics in recent_papers['Topics']:
+            if isinstance(topics, list):
+                for topic in topics:
+                    if topic in old_topics:
+                        existing_topic_count += 1
+                    else:
+                        new_topic_count += 1
+
+        exploration_ratio = new_topic_count / max(1, new_topic_count + existing_topic_count)
+    else:
+        exploration_ratio = 0.5  # Default to neutral if not enough data
+
+    # Determine research velocity trend
+    if len(monthly_counts) >= 3:
+        recent_months = sorted(monthly_counts.index)[-3:]
+        if len(recent_months) == 3:
+            start_count = monthly_counts[recent_months[0]]
+            end_count = monthly_counts[recent_months[2]]
+
+            if end_count > start_count * 1.2:
+                velocity_trend = "accelerating"
+            elif end_count < start_count * 0.8:
+                velocity_trend = "decelerating"
+            else:
+                velocity_trend = "stable"
+        else:
+            velocity_trend = "stable"
+    else:
+        velocity_trend = "stable"
+
+    return {
+        "knowledge_breadth": round(knowledge_breadth, 2),
+        "knowledge_depth": round(knowledge_depth, 2),
+        "research_efficiency": round(reading_efficiency, 2),
+        "topic_concentration": round(topic_concentration, 2),
+        "reading_consistency": round(reading_consistency, 2),
+        "exploration_vs_exploitation": round(exploration_ratio, 2),
+        "research_velocity_trend": velocity_trend
+    }
+
+
+def create_radar_chart(metrics):
+    """Create a radar chart of research metrics."""
+    categories = ['Knowledge Breadth', 'Knowledge Depth', 'Research Efficiency',
+                  'Reading Consistency', 'Topic Focus', 'Exploration']
+
+    values = [
+        metrics["knowledge_breadth"] * 5,  # Scale to 0-5
+        metrics["knowledge_depth"] / 2,  # Scale down if very high
+        metrics["research_efficiency"] * 5,
+        metrics["reading_consistency"] * 5,
+        metrics["topic_concentration"] * 5,
+        metrics["exploration_vs_exploitation"] * 5
+    ]
+
+    # Close the loop for the radar chart
+    categories = categories + [categories[0]]
+    values = values + [values[0]]
+
+    fig = go.Figure()
+
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=categories,
+        fill='toself',
+        name='Research Profile',
+        line=dict(color='#1f77b4'),
+        fillcolor='rgba(31, 119, 180, 0.3)'
+    ))
+
+    fig.update_layout(
+        polar=dict(
+            radialaxis=dict(
+                visible=True,
+                range=[0, 5]
+            )
+        ),
+        title="Research Profile Radar",
+        height=400
+    )
+
+    return fig
+
+
+def create_reading_forecast(paper_df):
+    """Create a forecast of reading progress based on historical data."""
+    if paper_df.empty or len(paper_df) < 3:
+        return None, None
+
+    # Ensure date is in datetime format
+    paper_df['Date Added'] = pd.to_datetime(paper_df['Date Added'], errors='coerce')
+    paper_df['Month'] = paper_df['Date Added'].dt.strftime('%Y-%m')
+
+    # Get monthly counts of papers added
+    monthly_added = paper_df.groupby('Month').size()
+
+    # Get monthly counts of papers read
+    monthly_read = paper_df[paper_df['Reading Status'] == 'Read'].groupby('Month').size()
+
+    # Merge the data
+    monthly_data = pd.DataFrame({
+        'Added': monthly_added,
+        'Read': monthly_read
+    }).fillna(0)
+
+    # Calculate the average read rate
+    read_rate = monthly_data['Read'].mean() / max(1, monthly_data['Added'].mean())
+    read_rate = min(1.0, read_rate)  # Cap at 1.0 (can't read more than 100%)
+
+    # Calculate average papers added per month
+    avg_added = monthly_data['Added'].mean()
+
+    # Calculate the current backlog
+    total_papers = len(paper_df)
+    read_papers = len(paper_df[paper_df['Reading Status'] == 'Read'])
+    backlog = total_papers - read_papers
+
+    # Calculate months to clear backlog
+    if read_rate * avg_added > 0:
+        months_to_clear = backlog / (read_rate * avg_added)
+    else:
+        months_to_clear = float('inf')
+
+    # Simple forecast model
+    current_date = datetime.now()
+    forecast_months = 6
+
+    forecast_dates = [current_date + timedelta(days=30 * i) for i in range(forecast_months)]
+    forecast_dates_str = [d.strftime('%Y-%m') for d in forecast_dates]
+
+    # Project based on historical trends
+    forecast_added = [round(avg_added) for _ in range(forecast_months)]
+    forecast_backlog = [backlog]
+
+    for i in range(forecast_months - 1):
+        new_backlog = forecast_backlog[-1] + forecast_added[i] - (avg_added * read_rate)
+        new_backlog = max(0, new_backlog)  # Can't have negative backlog
+        forecast_backlog.append(new_backlog)
+
+    # Create forecast DataFrame
+    forecast_df = pd.DataFrame({
+        'Month': forecast_dates_str,
+        'Projected Added': forecast_added,
+        'Projected Backlog': forecast_backlog
+    })
+
+    # Create a visualization
+    fig = go.Figure()
+    fig.add_trace(go.Bar(
+        x=forecast_df['Month'],
+        y=forecast_df['Projected Added'],
+        name='Projected New Papers',
+        marker_color='lightskyblue'
+    ))
+
+    fig.add_trace(go.Scatter(
+        x=forecast_df['Month'],
+        y=forecast_df['Projected Backlog'],
+        name='Projected Backlog',
+        marker_color='red',
+        mode='lines+markers'
+    ))
+
+    fig.update_layout(
+        title="6-Month Research Forecast",
+        xaxis_title="Month",
+        yaxis_title="Paper Count",
+        legend_title="Metrics",
+        height=400
+    )
+
+    forecast_metrics = {
+        "current_backlog": int(backlog),
+        "read_rate": round(read_rate * 100, 1),
+        "avg_monthly_papers": round(avg_added, 1),
+        "months_to_clear": round(months_to_clear, 1) if months_to_clear != float('inf') else "∞",
+        "backlog_trend": "increasing" if forecast_backlog[-1] > backlog else "decreasing" if forecast_backlog[
+                                                                                                 -1] < backlog else "stable"
+    }
+
+    return fig, forecast_metrics
+
+
+def generate_research_insights(paper_df, analysis_data, impact_metrics, forecast_metrics=None):
+    """Generate data-driven research insights."""
+    insights = []
+
+    if paper_df.empty or len(paper_df) < 3:
+        return ["Add at least 3 papers to generate meaningful insights."]
+
+    # Reading progress insights
+    completion_rate = analysis_data["completion_rate"]
+    if completion_rate < 30:
+        insights.append({
+            "category": "Reading Progress",
+            "insight": f"Low completion rate ({completion_rate:.1f}%)",
+            "recommendation": "Focus on completing existing papers before adding new ones",
+            "priority": "high" if completion_rate < 20 else "medium"
+        })
+    elif completion_rate > 70:
+        insights.append({
+            "category": "Reading Progress",
+            "insight": f"High completion rate ({completion_rate:.1f}%)",
+            "recommendation": "You're effectively completing papers. Consider increasing your research scope",
+            "priority": "low"
+        })
+
+    # Topic diversity insights
+    if impact_metrics["knowledge_breadth"] < 0.3 and len(paper_df) > 5:
+        insights.append({
+            "category": "Research Focus",
+            "insight": "Low topic diversity relative to paper count",
+            "recommendation": "Consider exploring adjacent research areas to broaden your knowledge",
+            "priority": "medium"
+        })
+    elif impact_metrics["knowledge_breadth"] > 1.5:
+        insights.append({
+            "category": "Research Focus",
+            "insight": "Very high topic diversity",
+            "recommendation": "Consider focusing on fewer areas for deeper expertise",
+            "priority": "medium"
+        })
+
+    # Topic concentration insights
+    if impact_metrics["topic_concentration"] > 0.5:
+        top_topic = max(analysis_data["topic_distribution"].items(), key=lambda x: x[1])[0] if analysis_data[
+            "topic_distribution"] else "None"
+        insights.append({
+            "category": "Research Specialization",
+            "insight": f"Strong specialization in '{top_topic}'",
+            "recommendation": "Your focused approach may lead to expertise. Consider exploring how this topic connects to others",
+            "priority": "low"
+        })
+
+    # Reading consistency insights
+    if impact_metrics["reading_consistency"] < 0.3 and len(paper_df) > 5:
+        insights.append({
+            "category": "Reading Habits",
+            "insight": "Inconsistent reading pattern with large variations between periods",
+            "recommendation": "Develop a more consistent research schedule for better knowledge retention",
+            "priority": "medium"
+        })
+
+    # Research velocity insights
+    if impact_metrics["research_velocity_trend"] == "decelerating" and len(paper_df) > 5:
+        insights.append({
+            "category": "Research Momentum",
+            "insight": "Your research pace is slowing down",
+            "recommendation": "Set specific goals for paper discovery and reading to maintain momentum",
+            "priority": "medium"
+        })
+    elif impact_metrics["research_velocity_trend"] == "accelerating":
+        insights.append({
+            "category": "Research Momentum",
+            "insight": "Accelerating research velocity",
+            "recommendation": "Ensure quality isn't sacrificed for quantity by maintaining thorough notes",
+            "priority": "low"
+        })
+
+
 def load_paper():
     """
     Load and validate the papers JSON file, with error handling and recovery.
@@ -197,7 +593,7 @@ def safe_date_parse(date_str):
     try:
         date = pd.to_datetime(date_str)
         return date.date() if pd.notnull(date) else datetime.today().date()
-    except:
+    except Exception as e:
         return datetime.today().date()
 
 
@@ -585,7 +981,7 @@ def main():
     if 'success_message' not in st.session_state:
         st.session_state.success_message = None
 
-    tab1, tab2, tab3, tab4 = st.tabs(["➕ Add Paper", "📋 View Collection", "🔍 Search & Edit", "📊 Analysis"])
+    tab1, tab2, tab3 = st.tabs(["➕ Add Paper", "📋 View Collection", "📊 Analysis"])
 
     with tab1:
         # Display success message if exists
@@ -706,19 +1102,19 @@ def main():
             with filter_col2:
                 # Reading status filter with multiselect
                 status_options = ["Want to Read", "Reading", "Read"]
-                status_filter = st.multiselect("📖 Reading Status",
-                                               options=["All"] + status_options,
-                                               default=["All"])
+                status_filter = st.radio("📖 Reading Status",
+                                         options=["All"] + status_options,
+                                         horizontal=True)
 
-                # Text search filter
-                text_filter = st.text_input("🔍 Search in Title/Description",
-                                            placeholder="Enter keywords...")
+                # Text search filter - integrated from tab 3
+                text_filter = st.text_input("🔍 Search by Title/Description/Topic",
+                                            placeholder="Enter keywords to search...")
 
         # View and sorting options
         view_col1, view_col2, view_col3 = st.columns([1, 1, 1])
 
         with view_col1:
-            view_type = st.radio("👁️ View Type", ["Cards", "Compact List", "Detailed Table"], horizontal=True)
+            view_type = st.radio("👁️ View Type", ["Cards", "Compact List", "Detailed Table"], horizontal=True, index=1)
 
         with view_col2:
             sort_by = st.selectbox("🔄 Sort by", ["Date Added", "Title", "Reading Status", "Topics Count"])
@@ -731,7 +1127,7 @@ def main():
 
         # Apply status filter
         if status_filter and "All" not in status_filter:
-            papers_to_display = papers_to_display[papers_to_display['Reading Status'].isin(status_filter)]
+            papers_to_display = papers_to_display[papers_to_display['Reading Status'].isin([status_filter])]
 
         # Apply topic filter
         if topic_filter and "All" not in topic_filter:
@@ -748,11 +1144,13 @@ def main():
                 (papers_to_display['Date Added'].dt.date <= end_date)
                 ]
 
-        # Apply text search filter
+        # Apply text search filter (enhanced to include topics)
         if text_filter:
             papers_to_display = papers_to_display[
                 papers_to_display['Title'].str.contains(text_filter, case=False, na=False) |
-                papers_to_display['Description'].str.contains(text_filter, case=False, na=False)
+                papers_to_display['Description'].str.contains(text_filter, case=False, na=False) |
+                papers_to_display['Topics'].apply(
+                    lambda x: any(text_filter.lower() in t.lower() for t in x if isinstance(x, list)))
                 ]
 
         # Add topics count for sorting
@@ -790,7 +1188,7 @@ def main():
 
                 for row in paper_rows:
                     cols = st.columns(3)
-                    for i, (_, paper) in enumerate(row.iterrows()):
+                    for i, (idx, paper) in enumerate(row.iterrows()):
                         with cols[i]:
                             status_color = {
                                 "Want to Read": "blue",
@@ -810,9 +1208,14 @@ def main():
                             if paper['Link']:
                                 st.markdown(f"[Open Paper]({paper['Link']})")
 
+                            # Add edit button
+                            if st.button(f"✏️ Edit", key=f"edit_card_{idx}"):
+                                st.session_state.selected_paper_index = idx
+                                st.session_state.edit_mode = True
+
             elif view_type == "Compact List":
                 # Compact list view
-                for _, paper in papers_to_display.iterrows():
+                for idx, paper in papers_to_display.iterrows():
                     status_emoji = {
                         "Want to Read": "🔹",
                         "Reading": "🔶",
@@ -822,12 +1225,17 @@ def main():
                     st.markdown(
                         f"{status_emoji} **{paper['Title']}** - {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''} *(Added: {pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')})*")
 
-                    col1, col2 = st.columns([1, 10])
+                    col1, col2, col3 = st.columns([1, 8, 1])
                     with col1:
-                        pass
-                    with col2:
                         if paper['Link']:
-                            st.markdown(f"[Open Paper]({paper['Link']})")
+                            st.markdown(f"[Open]({paper['Link']})")
+                    with col2:
+                        pass
+                    with col3:
+                        # Add edit button
+                        if st.button(f"✏️ Edit", key=f"edit_list_{idx}"):
+                            st.session_state.selected_paper_index = idx
+                            st.session_state.edit_mode = True
 
                     st.markdown("---")
 
@@ -836,13 +1244,12 @@ def main():
                 display_df = papers_to_display.copy()
                 display_df['Topics'] = display_df['Topics'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '')
                 display_df['Date Added'] = pd.to_datetime(display_df['Date Added']).dt.strftime('%Y-%m-%d')
-
-                # Reorder and select columns for display
-                display_df = display_df[['Title', 'Reading Status', 'Date Added', 'Topics']]
+                display_df['Actions'] = 'Edit'
 
                 # Show as table
+                table_data = display_df[['Title', 'Reading Status', 'Date Added', 'Topics']]
                 st.dataframe(
-                    display_df,
+                    table_data,
                     column_config={
                         "Title": st.column_config.TextColumn("Title"),
                         "Reading Status": st.column_config.TextColumn("Status"),
@@ -853,90 +1260,107 @@ def main():
                     hide_index=True
                 )
 
-        # Paper details section
-        if len(papers_to_display) > 0:
-            st.markdown("### 📑 Paper Details")
-            paper_titles = ["Select a paper to view details"] + list(papers_to_display['Title'].values)
-            selected_paper = st.selectbox("View paper details", options=paper_titles)
+                # Add separate edit option for table view
+                st.markdown("#### Select a paper to edit:")
+                paper_to_edit = st.selectbox(
+                    "Choose paper",
+                    options=papers_to_display['Title'].tolist(),
+                    key="table_edit_selector"
+                )
 
-            if selected_paper != "Select a paper to view details":
-                paper = papers_to_display[papers_to_display['Title'] == selected_paper].iloc[0]
+                if paper_to_edit:
+                    selected_idx = papers_to_display[papers_to_display['Title'] == paper_to_edit].index[0]
+                    if st.button(f"✏️ Edit {paper_to_edit}", key=f"edit_table_{selected_idx}"):
+                        st.session_state.selected_paper_index = selected_idx
+                        st.session_state.edit_mode = True
 
-                col1, col2 = st.columns([1, 2])
+        # Paper details and edit section
+        if hasattr(st.session_state, 'edit_mode') and st.session_state.edit_mode and hasattr(st.session_state,
+                                                                                             'selected_paper_index'):
+            st.markdown("### ✏️ Edit Paper")
+            index = st.session_state.selected_paper_index
+            paper = st.session_state.paper.loc[index]
+
+            with st.form(key=f"edit_form_{index}"):
+                col1, col2 = st.columns([1, 1])
+
                 with col1:
-                    st.markdown(f"**Status:** {paper['Reading Status']}")
-                    date_str = pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')
-                    st.markdown(f"**Added:** {date_str}")
-                    if paper['Link']:
-                        st.markdown(f"[Open Paper]({paper['Link']})")
-                    st.markdown(
-                        f"**Topics:** {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''}")
+                    new_title = st.text_input("Title", value=paper['Title'])
+                    new_status = st.selectbox(
+                        "Status",
+                        ["Want to Read", "Reading", "Read"],
+                        index=["Want to Read", "Reading", "Read"].index(paper['Reading Status'])
+                    )
+                    new_date = st.date_input(
+                        "Date Added",
+                        value=safe_date_parse(paper['Date Added'])
+                    )
 
                 with col2:
+                    new_link = st.text_input("Link", value=paper['Link'])
+                    new_topics = st.text_input("Topics", value=", ".join(paper['Topics']))
+
+                new_description = st.text_area("Notes", value=paper['Description'], height=150)
+
+                col1, col2 = st.columns([1, 1])
+                with col1:
+                    submitted = st.form_submit_button("💾 Save Changes")
+                with col2:
+                    cancel = st.form_submit_button("❌ Cancel")
+
+                if submitted:
+                    # Update the paper
+                    st.session_state.paper.at[index, 'Title'] = new_title
+                    st.session_state.paper.at[index, 'Reading Status'] = new_status
+                    st.session_state.paper.at[index, 'Date Added'] = new_date.strftime('%Y-%m-%d')
+                    st.session_state.paper.at[index, 'Link'] = new_link
+                    st.session_state.paper.at[index, 'Topics'] = [t.strip() for t in new_topics.split(",") if t.strip()]
+                    st.session_state.paper.at[index, 'Description'] = new_description
+                    save_paper(st.session_state.paper)
+                    st.success("✨ Changes saved successfully!")
+                    st.session_state.edit_mode = False
+                    st.rerun()
+
+                if cancel:
+                    st.session_state.edit_mode = False
+                    st.rerun()
+        else:
+            # Paper details section
+            if len(papers_to_display) > 0:
+                st.markdown("### 📑 Paper Details")
+                paper_titles = ["Select a paper to view details"] + list(papers_to_display['Title'].values)
+                selected_paper = st.selectbox("View paper details", options=paper_titles)
+
+                if selected_paper != "Select a paper to view details":
+                    paper = papers_to_display[papers_to_display['Title'] == selected_paper].iloc[0]
+                    paper_index = papers_to_display[papers_to_display['Title'] == selected_paper].index[0]
+
+                    col1, col2, col3 = st.columns([1, 1, 1])
+                    with col1:
+                        st.markdown(f"**Status:** {paper['Reading Status']}")
+                        date_str = pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')
+                        st.markdown(f"**Added:** {date_str}")
+                        if paper['Link']:
+                            st.markdown(f"[Open Paper]({paper['Link']})")
+                        st.markdown(
+                            f"**Topics:** {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''}")
+
+                    with col2:
+                        # Add edit button in the details view
+                        if st.button(f"✏️ Edit This Paper", key=f"edit_details_{paper_index}"):
+                            st.session_state.selected_paper_index = paper_index
+                            st.session_state.edit_mode = True
+
+                    with col3:
+                        pass
+
+                    st.markdown("### 📝 Notes")
                     if paper['Description']:
-                        st.markdown("### 📝 Notes")
                         st.markdown(paper['Description'])
                     else:
                         st.info("No notes added yet. Add some thoughts when you read the paper!")
 
     with tab3:
-        st.markdown("### 🔍 Search & Edit Papers")
-        search_term = st.text_input("Search papers by title, topic, or content...",
-                                    placeholder="Type to search your collection...")
-
-        if search_term:
-            mask = (
-                    st.session_state.paper['Title'].str.contains(search_term, case=False, na=False) |
-                    st.session_state.paper['Topics'].apply(
-                        lambda x: any(search_term.lower() in t.lower() for t in x if isinstance(x, list))) |
-                    st.session_state.paper['Description'].str.contains(search_term, case=False, na=False)
-            )
-            search_results = st.session_state.paper[mask]
-
-            if search_results.empty:
-                st.warning("🔍 No papers found matching your search.")
-            else:
-                st.success(f"🎯 Found {len(search_results)} matching papers!")
-
-                for index, paper in search_results.iterrows():
-                    with st.expander(f"✏️ Edit: {paper['Title']}", expanded=False):
-                        with st.form(key=f"edit_form_{index}"):
-                            col1, col2 = st.columns([1, 1])
-
-                            with col1:
-                                new_title = st.text_input("Title", value=paper['Title'])
-                                new_status = st.selectbox(
-                                    "Status",
-                                    ["Want to Read", "Reading", "Read"],
-                                    index=["Want to Read", "Reading", "Read"].index(paper['Reading Status'])
-                                )
-                                new_date = st.date_input(
-                                    "Date Added",
-                                    value=safe_date_parse(paper['Date Added'])
-                                )
-
-                            with col2:
-                                new_link = st.text_input("Link", value=paper['Link'])
-                                new_topics = st.text_input("Topics", value=", ".join(paper['Topics']))
-
-                            new_description = st.text_area("Notes", value=paper['Description'], height=150)
-
-                            # Add submit button for the form
-                            submitted = st.form_submit_button("💾 Save Changes")
-                            if submitted:
-                                # Update the paper
-                                st.session_state.paper.at[index, 'Title'] = new_title
-                                st.session_state.paper.at[index, 'Reading Status'] = new_status
-                                st.session_state.paper.at[index, 'Date Added'] = new_date.strftime('%Y-%m-%d')
-                                st.session_state.paper.at[index, 'Link'] = new_link
-                                st.session_state.paper.at[index, 'Topics'] = [t.strip() for t in new_topics.split(",") if
-                                                                              t.strip()]
-                                st.session_state.paper.at[index, 'Description'] = new_description
-                                save_paper(st.session_state.paper)
-                                st.success("✨ Changes saved successfully!")
-                                st.rerun()
-
-    with tab4:
         st.markdown("### 📊 Research Analysis Dashboard")
 
         # Get analysis data
@@ -976,16 +1400,20 @@ def main():
         with progress_cols[1]:
             st.markdown("##### Research Exploration vs. Focus")
             if analysis_data["total_papers"] > 0:
-                topics_per_paper = sum(
-                    len(topics) for topics in st.session_state.paper['Topics'] if isinstance(topics, list)) / \
-                                   analysis_data["total_papers"]
-                unique_topics = len(analysis_data["topic_distribution"])
-                topic_breadth = min(unique_topics / max(1, analysis_data["total_papers"]) * 100, 100)
-                topic_depth = min(analysis_data["read_papers"] / max(1, analysis_data["total_papers"]) * 100, 100)
+                # Calculate impact metrics using the provided function
+                impact_metrics = calculate_research_impact_metrics(st.session_state.paper)
 
                 metrics_data = pd.DataFrame({
-                    'Metric': ['Topics per Paper', 'Unique Research Areas', 'Research Breadth', 'Research Depth'],
-                    'Value': [f"{topics_per_paper:.1f}", unique_topics, f"{topic_breadth:.1f}%", f"{topic_depth:.1f}%"]
+                    'Metric': ['Knowledge Breadth', 'Knowledge Depth', 'Research Efficiency', 'Topic Concentration',
+                               'Reading Consistency', 'Exploration Ratio'],
+                    'Value': [
+                        f"{impact_metrics['knowledge_breadth']:.2f}",
+                        f"{impact_metrics['knowledge_depth']:.2f}",
+                        f"{impact_metrics['research_efficiency']:.2f}",
+                        f"{impact_metrics['topic_concentration']:.2f}",
+                        f"{impact_metrics['reading_consistency']:.2f}",
+                        f"{impact_metrics['exploration_vs_exploitation']:.2f}"
+                    ]
                 })
                 st.dataframe(metrics_data, hide_index=True, use_container_width=True)
             else:
@@ -1007,23 +1435,28 @@ def main():
                     'Papers': [m[1] for m in last_three_months]
                 })
                 st.dataframe(recent_activity, hide_index=True, use_container_width=True)
-                st.markdown(f"**Research Momentum:** {momentum_text}")
+
+                # Use the velocity trend from impact metrics
+                if 'impact_metrics' in locals():
+                    st.markdown(
+                        f"**Research Velocity Trend:** {impact_metrics['research_velocity_trend'].capitalize()}")
+                else:
+                    st.markdown(f"**Research Momentum:** {momentum_text}")
             else:
                 st.info("Add more papers to track research momentum")
 
-        # Display citation network and paper relationships
-        st.subheader("🔬 Research Knowledge Graph")
-        knowledge_cols = st.columns([2, 1])
-        with knowledge_cols[0]:
-            # Topic network visualization with improved academic context
-            network_fig = create_topic_network(st.session_state.paper)
-            if network_fig:
-                network_fig.update_layout(title="Research Domain Relationship Network")
-                st.plotly_chart(network_fig, use_container_width=True)
+        # Research profile radar chart
+        st.subheader("🔍 Research Profile")
+        radar_cols = st.columns([2, 1])
+        with radar_cols[0]:
+            if analysis_data["total_papers"] > 0:
+                # Use the provided function to create the radar chart
+                radar_fig = create_radar_chart(impact_metrics)
+                st.plotly_chart(radar_fig, use_container_width=True)
             else:
-                st.info("Add more papers with multiple topics to visualize your research domain network")
+                st.info("Add papers to see your research profile")
 
-        with knowledge_cols[1]:
+        with radar_cols[1]:
             # Research domain statistics
             if analysis_data["topic_distribution"]:
                 st.markdown("##### Top Research Areas")
@@ -1050,138 +1483,172 @@ def main():
             else:
                 st.info("Add topics to your papers to analyze research domains")
 
-        # Timeline with academic context
-        st.subheader("📅 Research Timeline & Evolution")
+        # Display citation network and paper relationships
+        st.subheader("🔬 Research Knowledge Graph")
+        knowledge_cols = st.columns([2, 1])
+        with knowledge_cols[0]:
+            # Topic network visualization with improved academic context
+            network_fig = create_topic_network(st.session_state.paper)
+            if network_fig:
+                network_fig.update_layout(title="Research Domain Relationship Network")
+                st.plotly_chart(network_fig, use_container_width=True)
+            else:
+                st.info("Add more papers with multiple topics to visualize your research domain network")
 
-        # Research evolution over time
-        timeline_fig = create_reading_timeline(st.session_state.paper)
-        if timeline_fig:
-            timeline_fig.update_layout(title="Research Paper Timeline")
-            st.plotly_chart(timeline_fig, use_container_width=True)
+        with knowledge_cols[1]:
+            # Topic evolution info
+            st.markdown("##### Topic Evolution")
+            if analysis_data["total_papers"] > 2:
+                st.write("See the evolution of research topics over time in the chart below.")
+            else:
+                st.info("Add at least 3 papers to see topic evolution")
+
+        # Topic evolution over time
+        topic_evolution_fig = create_topic_evolution(st.session_state.paper)
+        if topic_evolution_fig:
+            st.plotly_chart(topic_evolution_fig, use_container_width=True)
         else:
-            st.info("Add more papers with dates to visualize your research timeline")
+            st.info("Add more papers with topics and dates to visualize topic evolution")
 
-        # Monthly activity with trend analysis
-        if analysis_data["monthly_activity"] and len(analysis_data["monthly_activity"]) > 2:
-            monthly_cols = st.columns([3, 1])
-            with monthly_cols[0]:
-                months = list(analysis_data["monthly_activity"].keys())
-                counts = list(analysis_data["monthly_activity"].values())
+        # Research forecast section
+        st.subheader("📅 Research Forecast & Planning")
+        forecast_cols = st.columns([3, 1])
+        with forecast_cols[0]:
+            # Use the provided function to create the reading forecast
+            forecast_fig, forecast_metrics = create_reading_forecast(st.session_state.paper)
+            if forecast_fig:
+                st.plotly_chart(forecast_fig, use_container_width=True)
+            else:
+                st.info("Add more papers with dates to generate research forecasts")
 
-                monthly_df = pd.DataFrame({
-                    'Month': months,
-                    'Papers Added': counts
+        with forecast_cols[1]:
+            # Display forecast metrics
+            if forecast_metrics:
+                st.markdown("##### Research Forecast Metrics")
+                forecast_data = pd.DataFrame({
+                    'Metric': ['Current Backlog', 'Reading Rate', 'Avg Monthly Papers', 'Months to Clear Backlog',
+                               'Backlog Trend'],
+                    'Value': [
+                        f"{forecast_metrics['current_backlog']}",
+                        f"{forecast_metrics['read_rate']}%",
+                        f"{forecast_metrics['avg_monthly_papers']}",
+                        f"{forecast_metrics['months_to_clear']}",
+                        f"{forecast_metrics['backlog_trend'].capitalize()}"
+                    ]
                 })
-                monthly_df['Month'] = pd.to_datetime(monthly_df['Month'])
-                monthly_df = monthly_df.sort_values('Month')
+                st.dataframe(forecast_data, hide_index=True, use_container_width=True)
+            else:
+                st.info("Add more papers to see forecast metrics")
 
-                # Add trendline
-                fig = px.scatter(monthly_df, x='Month', y='Papers Added',
-                                 trendline="rolling", trendline_options=dict(window=3),
-                                 title="Research Intensity by Month")
-                fig.update_traces(marker=dict(size=10))
-                st.plotly_chart(fig, use_container_width=True)
-
-            with monthly_cols[1]:
-                st.markdown("##### Research Cycles")
-                # Calculate moving average
-                if len(monthly_df) >= 3:
-                    monthly_df['Rolling Avg'] = monthly_df['Papers Added'].rolling(window=3).mean()
-                    monthly_df = monthly_df.dropna()
-
-                    # Calculate variance to identify consistency
-                    variance = monthly_df['Papers Added'].var()
-                    avg = monthly_df['Papers Added'].mean()
-                    cov = (np.sqrt(variance) / avg) * 100 if avg > 0 else 0
-
-                    cycle_metrics = pd.DataFrame({
-                        'Metric': ['Average Monthly Papers', 'Research Consistency', 'Peak Research Month'],
-                        'Value': [
-                            f"{avg:.1f}",
-                            f"{100 - min(cov, 100):.0f}% (lower variance = more consistent)",
-                            monthly_df.loc[monthly_df['Papers Added'].idxmax(), 'Month'].strftime('%b %Y')
-                        ]
-                    })
-                    st.dataframe(cycle_metrics, hide_index=True, use_container_width=True)
-                else:
-                    st.info("More data needed for cycle analysis")
-        else:
-            st.info("Add more papers over time to see research activity patterns")
-
-        # Research insights and recommendations
+        # Research insights and recommendations section
         st.subheader("🧠 Research Insights & Recommendations")
-        insight_cols = st.columns(2)
 
-        with insight_cols[0]:
-            st.markdown("##### Current Research Patterns")
+        # Use direct insights generation instead of the potentially problematic function
+        if analysis_data["total_papers"] > 0:
+            # Create insights tabs
+            insight_tabs = st.tabs(["Research Focus", "Reading Habits", "Research Planning"])
 
-            # Generate insights based on the data
-            insights = []
+            with insight_tabs[0]:
+                st.markdown("##### Research Focus Insights")
+                focus_insights = []
 
-            if analysis_data["total_papers"] > 0:
-                # Topic concentration
-                top_topic = max(analysis_data["topic_distribution"].items(), key=lambda x: x[1])[0] if analysis_data[
-                    "topic_distribution"] else "None"
-                top_topic_percent = (
-                            max(analysis_data["topic_distribution"].values()) / analysis_data["total_papers"] * 100) if \
-                analysis_data["topic_distribution"] else 0
+                # Topic diversity insights
+                if 'impact_metrics' in locals():
+                    if impact_metrics["knowledge_breadth"] < 0.3 and analysis_data["total_papers"] > 5:
+                        focus_insights.append(
+                            "🔍 **Low topic diversity** - Consider exploring adjacent research areas to broaden your knowledge.")
+                    elif impact_metrics["knowledge_breadth"] > 1.5:
+                        focus_insights.append(
+                            "🌐 **Very high topic diversity** - Consider focusing on fewer areas for deeper expertise.")
 
-                if top_topic_percent > 50:
-                    insights.append(f"Strong focus on '{top_topic}' ({top_topic_percent:.1f}% of papers)")
-                elif top_topic_percent > 30:
-                    insights.append(f"Moderate specialization in '{top_topic}' ({top_topic_percent:.1f}% of papers)")
+                    # Topic concentration insights
+                    if impact_metrics["topic_concentration"] > 0.5 and analysis_data["topic_distribution"]:
+                        top_topic = max(analysis_data["topic_distribution"].items(), key=lambda x: x[1])[0]
+                        focus_insights.append(
+                            f"🎯 **Strong specialization in '{top_topic}'** - Your focused approach may lead to expertise. Consider exploring how this topic connects to others.")
 
-                # Reading completion
+                if analysis_data["topic_distribution"]:
+                    if len(analysis_data["topic_distribution"]) < 3 and analysis_data["total_papers"] > 5:
+                        focus_insights.append(
+                            "🔬 **Limited research domains** - Consider exploring related research areas to enhance interdisciplinary connections.")
+
+                # Display insights
+                if focus_insights:
+                    for insight in focus_insights:
+                        st.markdown(insight)
+                        st.divider()
+                else:
+                    st.info("Add more papers with diverse topics to generate research focus insights.")
+
+            with insight_tabs[1]:
+                st.markdown("##### Reading Habits Insights")
+                reading_insights = []
+
+                # Reading progress insights
                 completion_rate = analysis_data["completion_rate"]
                 if completion_rate < 30:
-                    insights.append(
-                        f"Low completion rate ({completion_rate:.1f}%) - consider focusing on current papers")
+                    reading_insights.append(
+                        f"📉 **Low completion rate ({completion_rate:.1f}%)** - Focus on completing existing papers before adding new ones.")
                 elif completion_rate > 70:
-                    insights.append(
-                        f"High completion rate ({completion_rate:.1f}%) - good follow-through on selected papers")
+                    reading_insights.append(
+                        f"📈 **High completion rate ({completion_rate:.1f}%)** - You're effectively completing papers. Consider increasing your research scope.")
 
-                # Reading velocity
+                # Reading velocity insights
                 if analysis_data["reading_velocity"] < 1:
-                    insights.append(
-                        f"Reading pace ({analysis_data['reading_velocity']:.1f} papers/month) suggests deep analysis")
+                    reading_insights.append(
+                        f"🐢 **Slow reading pace ({analysis_data['reading_velocity']:.1f} papers/month)** - This suggests deep analysis, which is good for thorough understanding.")
                 elif analysis_data["reading_velocity"] > 5:
-                    insights.append(
-                        f"High reading velocity ({analysis_data['reading_velocity']:.1f} papers/month) indicates survey research")
+                    reading_insights.append(
+                        f"🚀 **High reading velocity ({analysis_data['reading_velocity']:.1f} papers/month)** - Ensure you're retaining key information from your rapid reading.")
 
-            if not insights:
-                insights = ["Add more papers to generate research insights"]
+                # Reading consistency insights
+                if 'impact_metrics' in locals():
+                    if impact_metrics["reading_consistency"] < 0.3 and analysis_data["total_papers"] > 5:
+                        reading_insights.append(
+                            "📊 **Inconsistent reading pattern** - Develop a more consistent research schedule for better knowledge retention.")
 
-            for i, insight in enumerate(insights):
-                st.markdown(f"**{i + 1}.** {insight}")
+                # Display insights
+                if reading_insights:
+                    for insight in reading_insights:
+                        st.markdown(insight)
+                        st.divider()
+                else:
+                    st.info("Continue adding and reading papers to generate reading habit insights.")
 
-        with insight_cols[1]:
-            st.markdown("##### Research Recommendations")
+            with insight_tabs[2]:
+                st.markdown("##### Research Planning Insights")
+                planning_insights = []
 
-            # Generate recommendations based on the analysis
-            recommendations = []
+                # Research velocity insights
+                if 'impact_metrics' in locals():
+                    if impact_metrics["research_velocity_trend"] == "decelerating" and analysis_data[
+                        "total_papers"] > 5:
+                        planning_insights.append(
+                            "⏬ **Slowing research pace** - Set specific goals for paper discovery and reading to maintain momentum.")
+                    elif impact_metrics["research_velocity_trend"] == "accelerating":
+                        planning_insights.append(
+                            "⏫ **Accelerating research velocity** - Ensure quality isn't sacrificed for quantity by maintaining thorough notes.")
 
-            if analysis_data["total_papers"] > 0:
-                # Topic exploration
-                if len(analysis_data["topic_distribution"]) < 3 and analysis_data["total_papers"] > 5:
-                    recommendations.append("Consider exploring more diverse research areas")
+                # Backlog insights
+                if 'forecast_metrics' in locals():
+                    if forecast_metrics["backlog_trend"] == "increasing" and forecast_metrics["current_backlog"] > 5:
+                        planning_insights.append(
+                            f"📚 **Growing backlog ({forecast_metrics['current_backlog']} papers)** - Consider allocating more time to clear your reading backlog.")
 
-                # Reading focus
-                if analysis_data["want_to_read_papers"] > analysis_data["read_papers"] * 2:
-                    recommendations.append("Focus on reading existing papers before adding more")
+                    if forecast_metrics["months_to_clear"] != "∞" and float(forecast_metrics["months_to_clear"]) > 6:
+                        planning_insights.append(
+                            f"⏳ **Long backlog clearing time ({forecast_metrics['months_to_clear']} months)** - Consider being more selective with new papers or increasing reading rate.")
 
-                # Recent topics
-                if analysis_data["recent_topics"]:
-                    recommendations.append(f"Recent focus on: {', '.join(analysis_data['recent_topics'][:3])}")
+                # Display insights
+                if planning_insights:
+                    for insight in planning_insights:
+                        st.markdown(insight)
+                        st.divider()
+                else:
+                    st.info("Add more papers over time to generate research planning insights.")
+        else:
+            st.info("Add papers to receive research recommendations")
 
-                # Topic connections
-                if len(analysis_data["topic_distribution"]) > 3:
-                    recommendations.append("Look for interdisciplinary connections between your research domains")
-
-            if not recommendations:
-                recommendations = ["Add more papers to receive research recommendations"]
-
-            for i, recommendation in enumerate(recommendations):
-                st.markdown(f"**{i + 1}.** {recommendation}")
 
 if __name__ == "__main__":
     main()
