@@ -996,7 +996,7 @@ def main():
             with url_col1:
                 arxiv_url = st.text_input(
                     "ArXiv URL",
-                    placeholder="Enter arXiv URL..."
+                    value="https://arxiv.org/abs/"
                 )
 
             with url_col2:
@@ -1074,77 +1074,51 @@ def main():
 
         # Enhanced filters section
         with st.expander("🔍 Advanced Filters", expanded=True):
-            filter_col1, filter_col2 = st.columns([1, 1])
+            filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 1])
 
             with filter_col1:
-                # Topic filter with select all option
                 all_topics = set(topic for topics_list in st.session_state.paper['Topics'] for topic in topics_list if
                                  isinstance(topics_list, list))
                 topic_filter = st.multiselect("🏷️ Filter by Topics", options=["All"] + sorted(list(all_topics)))
 
-                # Date range filter
-                if not st.session_state.paper.empty and 'Date Added' in st.session_state.paper.columns:
-                    min_date = pd.to_datetime(st.session_state.paper['Date Added']).min()
-                    max_date = pd.to_datetime(st.session_state.paper['Date Added']).max()
-
-                    if pd.notna(min_date) and pd.notna(max_date):
-                        date_range = st.date_input(
-                            "📅 Date Range",
-                            value=(min_date.date(), max_date.date()),
-                            min_value=min_date.date(),
-                            max_value=max_date.date()
-                        )
-                    else:
-                        date_range = None
-                else:
-                    date_range = None
-
             with filter_col2:
-                # Reading status filter with multiselect
                 status_options = ["Want to Read", "Reading", "Read"]
-                status_filter = st.radio("📖 Reading Status",
-                                         options=["All"] + status_options,
-                                         horizontal=True)
+                status_filter = st.radio("📖 Reading Status", options=["All"] + status_options, horizontal=True)
 
-                # Text search filter - integrated from tab 3
+            with filter_col3:
                 text_filter = st.text_input("🔍 Search by Title/Description/Topic",
                                             placeholder="Enter keywords to search...")
 
-        # View and sorting options
-        view_col1, view_col2, view_col3 = st.columns([1, 1, 1])
+        date_range = None
 
-        with view_col1:
-            view_type = st.radio("👁️ View Type", ["Cards", "Compact List", "Detailed Table"], horizontal=True, index=1)
-
-        with view_col2:
+        # Sorting options
+        sort_col1, sort_col2 = st.columns([1, 1])
+        with sort_col1:
             sort_by = st.selectbox("🔄 Sort by", ["Date Added", "Title", "Reading Status", "Topics Count"])
-
-        with view_col3:
+        with sort_col2:
             sort_direction = st.radio("⬆️⬇️ Order", ["Descending", "Ascending"], horizontal=True)
 
-        # Apply filters
+        # Filtering logic
         papers_to_display = st.session_state.paper.copy()
 
         # Apply status filter
-        if status_filter and "All" not in status_filter:
-            papers_to_display = papers_to_display[papers_to_display['Reading Status'].isin([status_filter])]
+        if status_filter != "All":
+            papers_to_display = papers_to_display[papers_to_display['Reading Status'] == status_filter]
 
         # Apply topic filter
         if topic_filter and "All" not in topic_filter:
             papers_to_display = papers_to_display[
-                papers_to_display['Topics'].apply(lambda x: any(topic in x for topic in topic_filter))
-            ]
+                papers_to_display['Topics'].apply(
+                    lambda x: any(topic in x for topic in topic_filter) if isinstance(x, list) else False)]
 
         # Apply date range filter
         if date_range and len(date_range) == 2:
             papers_to_display['Date Added'] = pd.to_datetime(papers_to_display['Date Added'])
             start_date, end_date = date_range
-            papers_to_display = papers_to_display[
-                (papers_to_display['Date Added'].dt.date >= start_date) &
-                (papers_to_display['Date Added'].dt.date <= end_date)
-                ]
+            papers_to_display = papers_to_display[(papers_to_display['Date Added'].dt.date >= start_date) &
+                                                  (papers_to_display['Date Added'].dt.date <= end_date)]
 
-        # Apply text search filter (enhanced to include topics)
+        # Apply text filter
         if text_filter:
             papers_to_display = papers_to_display[
                 papers_to_display['Title'].str.contains(text_filter, case=False, na=False) |
@@ -1153,10 +1127,9 @@ def main():
                     lambda x: any(text_filter.lower() in t.lower() for t in x if isinstance(x, list)))
                 ]
 
-        # Add topics count for sorting
+        # Calculate topics count for sorting
         papers_to_display['Topics Count'] = papers_to_display['Topics'].apply(
-            lambda x: len(x) if isinstance(x, list) else 0
-        )
+            lambda x: len(x) if isinstance(x, list) else 0)
 
         # Apply sorting
         ascending = sort_direction == "Ascending"
@@ -1166,7 +1139,6 @@ def main():
         elif sort_by == "Title":
             papers_to_display = papers_to_display.sort_values('Title', ascending=ascending)
         elif sort_by == "Reading Status":
-            # Custom sort order for Reading Status
             status_order = {"Read": 0, "Reading": 1, "Want to Read": 2}
             if ascending:
                 status_order = {k: -v for k, v in status_order.items()}
@@ -1175,106 +1147,7 @@ def main():
         elif sort_by == "Topics Count":
             papers_to_display = papers_to_display.sort_values('Topics Count', ascending=ascending)
 
-        # Display count of filtered papers
-        st.markdown(f"**Showing {len(papers_to_display)} papers**")
-
-        if papers_to_display.empty:
-            st.info("No papers match your filter criteria.")
-        else:
-            # Display papers based on view type
-            if view_type == "Cards":
-                # Card view - grid layout
-                paper_rows = [papers_to_display.iloc[i:i + 3] for i in range(0, len(papers_to_display), 3)]
-
-                for row in paper_rows:
-                    cols = st.columns(3)
-                    for i, (idx, paper) in enumerate(row.iterrows()):
-                        with cols[i]:
-                            status_color = {
-                                "Want to Read": "blue",
-                                "Reading": "orange",
-                                "Read": "green"
-                            }.get(paper['Reading Status'], "gray")
-
-                            st.markdown(f"""
-                            <div style="border:1px solid #ddd; border-radius:5px; padding:10px; margin:5px; height:200px; overflow:auto">
-                                <h4>{paper['Title']}</h4>
-                                <p><span style="color:{status_color}">●</span> {paper['Reading Status']}</p>
-                                <p><small>Added: {pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')}</small></p>
-                                <p>Topics: {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''}</p>
-                            </div>
-                            """, unsafe_allow_html=True)
-
-                            if paper['Link']:
-                                st.markdown(f"[Open Paper]({paper['Link']})")
-
-                            # Add edit button
-                            if st.button(f"✏️ Edit", key=f"edit_card_{idx}"):
-                                st.session_state.selected_paper_index = idx
-                                st.session_state.edit_mode = True
-
-            elif view_type == "Compact List":
-                # Compact list view
-                for idx, paper in papers_to_display.iterrows():
-                    status_emoji = {
-                        "Want to Read": "🔹",
-                        "Reading": "🔶",
-                        "Read": "✅"
-                    }.get(paper['Reading Status'], "📄")
-
-                    st.markdown(
-                        f"{status_emoji} **{paper['Title']}** - {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''} *(Added: {pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')})*")
-
-                    col1, col2, col3 = st.columns([1, 8, 1])
-                    with col1:
-                        if paper['Link']:
-                            st.markdown(f"[Open]({paper['Link']})")
-                    with col2:
-                        pass
-                    with col3:
-                        # Add edit button
-                        if st.button(f"✏️ Edit", key=f"edit_list_{idx}"):
-                            st.session_state.selected_paper_index = idx
-                            st.session_state.edit_mode = True
-
-                    st.markdown("---")
-
-            else:  # Detailed Table view
-                # Convert to a format suitable for display
-                display_df = papers_to_display.copy()
-                display_df['Topics'] = display_df['Topics'].apply(lambda x: ', '.join(x) if isinstance(x, list) else '')
-                display_df['Date Added'] = pd.to_datetime(display_df['Date Added']).dt.strftime('%Y-%m-%d')
-                display_df['Actions'] = 'Edit'
-
-                # Show as table
-                table_data = display_df[['Title', 'Reading Status', 'Date Added', 'Topics']]
-                st.dataframe(
-                    table_data,
-                    column_config={
-                        "Title": st.column_config.TextColumn("Title"),
-                        "Reading Status": st.column_config.TextColumn("Status"),
-                        "Date Added": st.column_config.TextColumn("Added On"),
-                        "Topics": st.column_config.TextColumn("Topics")
-                    },
-                    use_container_width=True,
-                    hide_index=True
-                )
-
-                # Add separate edit option for table view
-                st.markdown("#### Select a paper to edit:")
-                paper_to_edit = st.selectbox(
-                    "Choose paper",
-                    options=papers_to_display['Title'].tolist(),
-                    key="table_edit_selector"
-                )
-
-                if paper_to_edit:
-                    selected_idx = papers_to_display[papers_to_display['Title'] == paper_to_edit].index[0]
-                    if st.button(f"✏️ Edit {paper_to_edit}", key=f"edit_table_{selected_idx}"):
-                        st.session_state.selected_paper_index = selected_idx
-                        st.session_state.edit_mode = True
-
-        # Paper details and edit section
+        # Paper edit form
         if hasattr(st.session_state, 'edit_mode') and st.session_state.edit_mode and hasattr(st.session_state,
                                                                                              'selected_paper_index'):
             st.markdown("### ✏️ Edit Paper")
@@ -1298,7 +1171,8 @@ def main():
 
                 with col2:
                     new_link = st.text_input("Link", value=paper['Link'])
-                    new_topics = st.text_input("Topics", value=", ".join(paper['Topics']))
+                    new_topics = st.text_input("Topics", value=", ".join(paper['Topics']) if isinstance(paper['Topics'],
+                                                                                                        list) else "")
 
                 new_description = st.text_area("Notes", value=paper['Description'], height=150)
 
@@ -1325,40 +1199,55 @@ def main():
                     st.session_state.edit_mode = False
                     st.rerun()
         else:
-            # Paper details section
-            if len(papers_to_display) > 0:
-                st.markdown("### 📑 Paper Details")
-                paper_titles = ["Select a paper to view details"] + list(papers_to_display['Title'].values)
-                selected_paper = st.selectbox("View paper details", options=paper_titles)
+            # Paper display section
+            st.markdown(f"**Showing {len(papers_to_display)} papers**")
 
-                if selected_paper != "Select a paper to view details":
-                    paper = papers_to_display[papers_to_display['Title'] == selected_paper].iloc[0]
-                    paper_index = papers_to_display[papers_to_display['Title'] == selected_paper].index[0]
+            if papers_to_display.empty:
+                st.info("No papers match your filter criteria.")
+            else:
+                # Display papers in expandable card view with custom styling
+                for idx, paper in papers_to_display.iterrows():
+                    status_emoji = {
+                        "Want to Read": "🔹",
+                        "Reading": "🔶",
+                        "Read": "✅"
+                    }.get(paper['Reading Status'], "📄")
 
-                    col1, col2, col3 = st.columns([1, 1, 1])
-                    with col1:
-                        st.markdown(f"**Status:** {paper['Reading Status']}")
-                        date_str = pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d')
-                        st.markdown(f"**Added:** {date_str}")
-                        if paper['Link']:
-                            st.markdown(f"[Open Paper]({paper['Link']})")
-                        st.markdown(
-                            f"**Topics:** {', '.join(paper['Topics']) if isinstance(paper['Topics'], list) else ''}")
+                    # Format the card header with title and date
+                    paper_title = paper['Title'] if not pd.isna(paper['Title']) else "Untitled Paper"
+                    date_str = pd.to_datetime(paper['Date Added']).strftime('%Y-%m-%d') if not pd.isna(
+                        paper['Date Added']) else ""
+                    card_header = f"{status_emoji} {paper_title} ({date_str})"
 
-                    with col2:
-                        # Add edit button in the details view
-                        if st.button(f"✏️ Edit This Paper", key=f"edit_details_{paper_index}"):
-                            st.session_state.selected_paper_index = paper_index
-                            st.session_state.edit_mode = True
+                    # Create the expandable card
+                    with st.expander(card_header):
+                        # Card content
+                        col1, col2 = st.columns([3, 1])
 
-                    with col3:
-                        pass
+                        with col1:
+                            st.markdown(f"**Status:** {paper['Reading Status']}")
 
-                    st.markdown("### 📝 Notes")
-                    if paper['Description']:
-                        st.markdown(paper['Description'])
-                    else:
-                        st.info("No notes added yet. Add some thoughts when you read the paper!")
+                            # Display topics if they exist
+                            topics_str = ", ".join(paper['Topics']) if isinstance(paper['Topics'], list) and paper[
+                                'Topics'] else "No topics"
+                            st.markdown(f"**Topics:** {topics_str}")
+
+                            # Display link if it exists
+                            if paper['Link'] and not pd.isna(paper['Link']):
+                                st.markdown(f"[Open Paper]({paper['Link']})")
+
+                        with col2:
+                            if st.button(f"✏️ Edit", key=f"edit_card_{idx}"):
+                                st.session_state.selected_paper_index = idx
+                                st.session_state.edit_mode = True
+                                st.rerun()
+
+                        # Notes section
+                        st.markdown("#### 📝 Notes")
+                        if paper['Description'] and not pd.isna(paper['Description']):
+                            st.markdown(paper['Description'])
+                        else:
+                            st.info("No notes added yet.")
 
     with tab3:
         st.markdown("### 📊 Research Analysis Dashboard")
