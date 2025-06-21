@@ -71,44 +71,96 @@ READING_QUOTES = [
 ]
 
 
+def fetch_paper_details(arxiv_url):
+    """Fetch paper details directly using requests with explicit SSL verification disabled."""
+    try:
+        import re
+        import requests
+        import xml.etree.ElementTree as ET
+        from datetime import datetime
+        
+        # Suppress SSL warning messages
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        # Extract arXiv ID from URL
+        arxiv_id = extract_arxiv_id(arxiv_url)
+        if not arxiv_id:
+            return None, "Invalid arXiv URL format"
+        
+        # Make direct request to arXiv API with SSL verification disabled
+        api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
+        
+        try:
+            response = requests.get(api_url, verify=False, timeout=10)
+            
+            if response.status_code != 200:
+                return None, f"API returned status code {response.status_code}"
+            
+            # XML namespaces for arXiv API
+            ns = {
+                'atom': 'http://www.w3.org/2005/Atom',
+                'arxiv': 'http://arxiv.org/schemas/atom'
+            }
+            
+            # Parse XML response
+            root = ET.fromstring(response.content)
+            
+            # Check if paper exists
+            entry = root.find('.//atom:entry', ns)
+            if entry is None:
+                return None, f"No paper found with ID {arxiv_id}"
+            
+            # Extract paper details
+            title = entry.find('./atom:title', ns).text.strip()
+            summary = entry.find('./atom:summary', ns).text.strip().replace('\n', ' ')
+            
+            # Get publication date
+            published = entry.find('./atom:published', ns).text
+            published_date = datetime.strptime(published, '%Y-%m-%dT%H:%M:%SZ').strftime('%Y-%m-%d')
+            
+            # Extract categories/topics
+            categories = []
+            for category in entry.findall('./atom:category', ns):
+                term = category.get('term')
+                if term and '.' in term:
+                    # Extract primary category (e.g., 'cs' from 'cs.CL')
+                    primary = term.split('.')[0]
+                    if primary not in categories:
+                        categories.append(primary)
+            
+            # Create paper details dictionary
+            paper_details = {
+                'title': title,
+                'topics': categories,
+                'description': summary,
+                'date': published_date,
+                'link': arxiv_url
+            }
+            
+            return paper_details, None
+            
+        except requests.exceptions.RequestException as e:
+            return None, f"Request error: {str(e)}"
+            
+    except Exception as e:
+        return None, f"Error fetching paper details: {str(e)}"
+
+
 def extract_arxiv_id(url):
     """Extract arXiv ID from URL or return the ID if directly provided."""
+    import re
+    
     # Match patterns like arxiv.org/abs/2312.12345 or arxiv.org/pdf/2312.12345.pdf
     patterns = [
         r'arxiv\.org/(?:abs|pdf)/(\d+\.\d+)',
-        r'(\d{4}\.\d{4,5})'  # Direct arXiv ID format
+        r'(\d{4}\.\d{5,6})'  # Direct arXiv ID format (handle both 4 and 5+ digit formats)
     ]
 
     for pattern in patterns:
         if match := re.search(pattern, url):
             return match.group(1)
     return None
-
-
-def fetch_paper_details(arxiv_url):
-    """Fetch paper details from arXiv API."""
-    try:
-        arxiv_id = extract_arxiv_id(arxiv_url)
-        if not arxiv_id:
-            return None, "Invalid arXiv URL format"
-
-        # Search for the paper
-        client = arxiv.Client()
-        search = arxiv.Search(id_list=[arxiv_id])
-        paper = next(client.results(search))
-
-        # Create paper details dictionary
-        paper_details = {
-            'title': paper.title,
-            'topics': [],
-            'description': paper.summary.replace("\n", " ").strip(),
-            'date': paper.published.strftime('%Y-%m-%d'),
-            'link': arxiv_url
-        }
-
-        return paper_details, None
-    except Exception as e:
-        return None, f"Error fetching paper details: {str(e)}"
 
 
 def create_topic_evolution(paper_df):
@@ -879,7 +931,14 @@ def create_topic_network(paper_df):
     # Create node trace
     node_x = [pos[0] for pos in node_positions.values()]
     node_y = [pos[1] for pos in node_positions.values()]
+    
+    # Calculate node colors based on paper count
+    node_adjacencies = []
+    for node in nodes:
+        count = sum(1 for topics in paper_df['Topics'] if isinstance(topics, list) and node in topics)
+        node_adjacencies.append(count)
 
+    # Create node trace with a simplified marker configuration
     node_trace = go.Scatter(
         x=node_x, y=node_y,
         mode='markers+text',
@@ -890,27 +949,18 @@ def create_topic_network(paper_df):
             showscale=True,
             colorscale='Viridis',
             size=node_sizes,
-            colorbar=dict(
-                thickness=15,
-                title='Paper Count',
-                xanchor='left',
-                titleside='right'
-            ),
+            color=node_adjacencies,  # Set color at initialization
             line_width=2))
+    
+    # Skip the colorbar for now to simplify
 
-    # Color nodes by frequency
-    node_adjacencies = []
-    for node in nodes:
-        count = sum(1 for topics in paper_df['Topics'] if isinstance(topics, list) and node in topics)
-        node_adjacencies.append(count)
-
-    node_trace.marker.color = node_adjacencies
-
-    # Create figure
+    # Create figure with corrected title format
     fig = go.Figure(data=[edge_trace, node_trace],
                     layout=go.Layout(
-                        title='Topic Relationship Network',
-                        titlefont_size=16,
+                        title=dict(
+                            text='Topic Relationship Network',
+                            font=dict(size=16)
+                        ),
                         showlegend=False,
                         hovermode='closest',
                         margin=dict(b=20, l=5, r=5, t=40),
@@ -920,7 +970,6 @@ def create_topic_network(paper_df):
                     ))
 
     return fig
-
 
 def main():
     # Set page config with a fun emoji and custom theme
@@ -1017,11 +1066,16 @@ def main():
                 else:
                     st.warning("Please enter an arXiv URL")
 
+        # Get existing topics for suggestions
+        all_topics = set(topic for topics_list in st.session_state.paper['Topics'] for topic in topics_list if
+                        isinstance(topics_list, list))
+        sorted_topics = sorted(list(all_topics))
+
         # Separate form for adding paper details
         with st.form(key="add_paper_form"):
             title = st.text_input("📕 Paper Title",
-                                  value=st.session_state.get('paper_details', {}).get('title', ''),
-                                  placeholder="Enter the paper title...")
+                                value=st.session_state.get('paper_details', {}).get('title', ''),
+                                placeholder="Enter the paper title...")
 
             col1, col2 = st.columns(2)
             with col1:
@@ -1039,11 +1093,43 @@ def main():
 
             with col2:
                 link = st.text_input("🌐 Link",
-                                     value=st.session_state.get('paper_details', {}).get('link', ''),
-                                     help="ArXiv or DOI link")
-                topics = st.text_input("🏷️ Topics",
-                                       placeholder="AI, ML, NLP...",
-                                       help="Comma-separated topics")
+                                    value=st.session_state.get('paper_details', {}).get('link', ''),
+                                    help="ArXiv or DOI link")
+                
+                # Multi-select for topics with autocomplete
+                if sorted_topics:
+                    # Initialize default topics from session state if available
+                    default_topics = []
+                    if st.session_state.get('paper_details', {}).get('topics'):
+                        paper_topics = st.session_state.get('paper_details', {}).get('topics')
+                        # Filter to only include topics that exist in sorted_topics
+                        default_topics = [topic for topic in paper_topics if topic in sorted_topics]
+                    
+                    selected_topics = st.multiselect(
+                        "🏷️ Topics",
+                        options=sorted_topics,
+                        default=default_topics,
+                        help="Select existing topics or type to create new ones"
+                    )
+                    
+                    # Allow custom topics with a text input field
+                    custom_topics = st.text_input(
+                        "Add Custom Topics",
+                        placeholder="Type new topics (comma-separated)",
+                        help="Add topics not in the suggestion list"
+                    )
+                    
+                    # Combine selected and custom topics
+                    topic_list = selected_topics.copy()
+                    if custom_topics:
+                        custom_topic_list = [t.strip() for t in custom_topics.split(",") if t.strip()]
+                        topic_list.extend(custom_topic_list)
+                else:
+                    # Fallback to regular text input if no existing topics
+                    topics = st.text_input("🏷️ Topics",
+                                        placeholder="AI, ML, NLP...",
+                                        help="Comma-separated topics")
+                    topic_list = [t.strip() for t in topics.split(",") if t.strip()]
 
             description = st.text_area(
                 "📝 Notes & Thoughts",
@@ -1057,10 +1143,9 @@ def main():
                 if not title:
                     st.error("Please enter a paper title!")
                 else:
-                    topic_list = [t.strip() for t in topics.split(",") if t.strip()]
                     if add_paper(title, reading_status,
-                                 date_added.strftime('%Y-%m-%d'),
-                                 link, topic_list, description):
+                                date_added.strftime('%Y-%m-%d'),
+                                link, topic_list, description):
                         st.session_state.success_message = "🎉 Paper added successfully!"
                         # Clear the paper details after successful addition
                         st.session_state.paper_details = {}
@@ -1069,6 +1154,7 @@ def main():
                         st.session_state.description = ""
                         st.rerun()
 
+                        
     with tab2:
         st.markdown("### 📚 Your Paper Collection")
 
