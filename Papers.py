@@ -130,16 +130,24 @@ def fetch_paper_details(arxiv_url):
         # Extract arXiv ID from URL
         arxiv_id = extract_arxiv_id(arxiv_url)
         if not arxiv_id:
+            print(f"❌ Invalid arXiv URL format: {arxiv_url}")
             return None, "Invalid arXiv URL format"
+        
+        print(f"📡 Fetching paper details for arXiv ID: {arxiv_id}")
         
         # Make direct request to arXiv API with SSL verification disabled
         api_url = f"https://export.arxiv.org/api/query?id_list={arxiv_id}"
+        print(f"🌐 Making API request to: {api_url}")
         
         try:
             response = requests.get(api_url, verify=False, timeout=10)
+            print(f"📊 API Response Status: {response.status_code}")
+            print(f"📋 Content Type: {response.headers.get('content-type', 'N/A')}")
             
             if response.status_code != 200:
-                return None, f"API returned status code {response.status_code}"
+                error_msg = f"API returned status code {response.status_code}"
+                print(f"❌ {error_msg}")
+                return None, error_msg
             
             # XML namespaces for arXiv API
             ns = {
@@ -149,47 +157,136 @@ def fetch_paper_details(arxiv_url):
             
             # Parse XML response
             root = ET.fromstring(response.content)
+            print(f"✅ Successfully parsed XML response")
             
             # Check if paper exists
             entry = root.find('.//atom:entry', ns)
             if entry is None:
-                return None, f"No paper found with ID {arxiv_id}"
+                error_msg = f"No paper found with ID {arxiv_id}"
+                print(f"❌ {error_msg}")
+                return None, error_msg
             
-            # Extract paper details
-            title = entry.find('./atom:title', ns).text.strip()
-            summary = entry.find('./atom:summary', ns).text.strip().replace('\n', ' ')
+            print(f"📄 Found paper entry, extracting details...")
             
-            # Get publication date
-            published = entry.find('./atom:published', ns).text
-            published_date = datetime.strptime(published, '%Y-%m-%dT%H:%M:%SZ').strftime('%Y-%m-%d')
+            # Extract basic paper details
+            title_elem = entry.find('./atom:title', ns)
+            title = title_elem.text.strip() if title_elem is not None else "Unknown Title"
+            print(f"📖 Title: {title}")
             
-            # Extract categories/topics
-            categories = []
-            for category in entry.findall('./atom:category', ns):
-                term = category.get('term')
+            summary_elem = entry.find('./atom:summary', ns)
+            summary = summary_elem.text.strip().replace('\n', ' ') if summary_elem is not None else "No summary available"
+            print(f"📝 Summary length: {len(summary)} characters")
+            
+            # Get publication and update dates
+            published_elem = entry.find('./atom:published', ns)
+            published = published_elem.text if published_elem is not None else None
+            published_date = datetime.strptime(published, '%Y-%m-%dT%H:%M:%SZ').strftime('%Y-%m-%d') if published else ""
+            print(f"📅 Published: {published_date}")
+            
+            updated_elem = entry.find('./atom:updated', ns)
+            updated = updated_elem.text if updated_elem is not None else None
+            updated_date = datetime.strptime(updated, '%Y-%m-%dT%H:%M:%SZ').strftime('%Y-%m-%d') if updated else ""
+            if updated_date and updated_date != published_date:
+                print(f"🔄 Last Updated: {updated_date}")
+            
+            # Extract authors
+            authors = []
+            author_elements = entry.findall('./atom:author', ns)
+            print(f"👥 Found {len(author_elements)} author(s):")
+            for author_elem in author_elements:
+                name_elem = author_elem.find('./atom:name', ns)
+                if name_elem is not None:
+                    author_name = name_elem.text.strip()
+                    authors.append(author_name)
+                    print(f"   📝 {author_name}")
+            
+            # Extract comment (additional metadata)
+            comment_elem = entry.find('./arxiv:comment', ns)
+            comment = comment_elem.text.strip() if comment_elem is not None else ""
+            if comment:
+                print(f"💬 Comment: {comment}")
+            
+            # Extract PDF link
+            pdf_link = ""
+            link_elements = entry.findall('./atom:link', ns)
+            for link_elem in link_elements:
+                if link_elem.get('type') == 'application/pdf':
+                    pdf_link = link_elem.get('href', '')
+                    print(f"📑 PDF Link: {pdf_link}")
+                    break
+            
+            # Extract primary category
+            primary_category_elem = entry.find('./arxiv:primary_category', ns)
+            primary_category = primary_category_elem.get('term', '') if primary_category_elem is not None else ""
+            if primary_category:
+                print(f"🏷️ Primary Category: {primary_category}")
+            
+            # Extract all categories (including subcategories)
+            all_categories = []
+            categories = []  # For backward compatibility (primary categories only)
+            category_elements = entry.findall('./atom:category', ns)
+            print(f"📂 Found {len(category_elements)} categor{'ies' if len(category_elements) != 1 else 'y'}:")
+            
+            for category_elem in category_elements:
+                term = category_elem.get('term', '')
+                all_categories.append(term)
+                print(f"   🏷️ {term}")
+                
+                # Extract primary category for backward compatibility
                 if term and '.' in term:
-                    # Extract primary category (e.g., 'cs' from 'cs.CL')
                     primary = term.split('.')[0]
                     if primary not in categories:
                         categories.append(primary)
             
-            # Create paper details dictionary
+            # Extract version information from ID
+            id_elem = entry.find('./atom:id', ns)
+            version = ""
+            if id_elem is not None:
+                id_text = id_elem.text
+                # Extract version from ID like "http://arxiv.org/abs/2301.07041v2"
+                version_match = re.search(r'v(\d+)$', id_text)
+                if version_match:
+                    version = version_match.group(1)
+                    print(f"📌 Version: v{version}")
+            
+            print(f"✅ Successfully extracted all paper details")
+            
+            # Create enhanced paper details dictionary
             paper_details = {
                 'title': title,
-                'topics': categories,
+                'authors': authors,
+                'topics': categories,  # Primary categories for backward compatibility
+                'all_categories': all_categories,  # All ArXiv categories including subcategories
+                'primary_category': primary_category,
                 'description': summary,
+                'comment': comment,
+                'version': version,
                 'date_added': datetime.today().strftime('%Y-%m-%d'),  # Current date when added
                 'date_published': published_date,  # ArXiv publication date
-                'link': arxiv_url
+                'date_updated': updated_date,  # ArXiv last update date
+                'link': arxiv_url,
+                'pdf_link': pdf_link
             }
+            
+            print(f"📊 Paper details summary:")
+            print(f"   📖 Title: {title[:60]}{'...' if len(title) > 60 else ''}")
+            print(f"   👥 Authors: {', '.join(authors[:3])}{'...' if len(authors) > 3 else ''}")
+            print(f"   🏷️ Categories: {', '.join(categories)}")
+            print(f"   📅 Published: {published_date}")
+            if updated_date and updated_date != published_date:
+                print(f"   🔄 Updated: {updated_date}")
             
             return paper_details, None
             
         except requests.exceptions.RequestException as e:
-            return None, f"Request error: {str(e)}"
+            error_msg = f"Request error: {str(e)}"
+            print(f"❌ {error_msg}")
+            return None, error_msg
             
     except Exception as e:
-        return None, f"Error fetching paper details: {str(e)}"
+        error_msg = f"Error fetching paper details: {str(e)}"
+        print(f"❌ {error_msg}")
+        return None, error_msg
 
 
 def extract_arxiv_id(url):
@@ -206,6 +303,154 @@ def extract_arxiv_id(url):
         if match := re.search(pattern, url):
             return match.group(1)
     return None
+
+
+def is_arxiv_url(url):
+    """Check if URL is from ArXiv."""
+    if not url:
+        return False
+    return 'arxiv.org' in str(url).lower()
+
+
+def needs_paper_update(paper):
+    """Check if a paper needs updating based on missing fields."""
+    missing_fields = []
+    
+    # Check for missing fields that can be extracted from ArXiv
+    if not paper.get('Authors') or (isinstance(paper.get('Authors'), list) and len(paper.get('Authors')) == 0):
+        missing_fields.append('Authors')
+    
+    if not paper.get('Date Updated'):
+        missing_fields.append('Date Updated')
+    
+    if not paper.get('Comment'):
+        missing_fields.append('Comment')
+    
+    if not paper.get('PDF Link'):
+        missing_fields.append('PDF Link')
+    
+    if not paper.get('Primary Category'):
+        missing_fields.append('Primary Category')
+    
+    if not paper.get('All Categories') or (isinstance(paper.get('All Categories'), list) and len(paper.get('All Categories')) == 0):
+        missing_fields.append('All Categories')
+    
+    if not paper.get('Version'):
+        missing_fields.append('Version')
+    
+    # Only check Date Published for ArXiv papers
+    if not paper.get('Date Published') and is_arxiv_url(paper.get('Link')):
+        missing_fields.append('Date Published')
+    
+    return len(missing_fields) > 0, missing_fields
+
+
+def auto_fill_missing_paper_info():
+    """Auto-fill missing information for all ArXiv papers in the database."""
+    if 'paper' not in st.session_state or st.session_state.paper.empty:
+        st.error("No papers found in the database!")
+        return 0, 0
+    
+    paper_df = st.session_state.paper.copy()
+    
+    # Find papers that need updating
+    papers_to_update = []
+    for index, paper in paper_df.iterrows():
+        if is_arxiv_url(paper.get('Link')):
+            needs_upd, missing_fields = needs_paper_update(paper)
+            if needs_upd:
+                papers_to_update.append((index, paper, missing_fields))
+    
+    if not papers_to_update:
+        st.success("✅ All ArXiv papers already have complete information!")
+        return 0, 0
+    
+    st.info(f"🔍 Found {len(papers_to_update)} ArXiv papers that need updating")
+    
+    # Create progress indicators
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    updated_count = 0
+    failed_count = 0
+    
+    for i, (index, paper, missing_fields) in enumerate(papers_to_update):
+        # Update progress
+        progress = (i + 1) / len(papers_to_update)
+        progress_bar.progress(progress)
+        status_text.text(f"Processing {i+1}/{len(papers_to_update)}: {paper['Title'][:50]}...")
+        
+        # Fetch enhanced details from ArXiv
+        enhanced_data, error = fetch_paper_details(paper['Link'])
+        
+        if error:
+            failed_count += 1
+            continue
+        
+        # Update paper fields with new information
+        updated_fields = []
+        
+        # Update Authors
+        if ('Authors' in missing_fields and enhanced_data.get('authors')):
+            paper_df.at[index, 'Authors'] = enhanced_data['authors']
+            updated_fields.append('Authors')
+        
+        # Update Date Updated
+        if ('Date Updated' in missing_fields and enhanced_data.get('date_updated')):
+            paper_df.at[index, 'Date Updated'] = enhanced_data['date_updated']
+            updated_fields.append('Date Updated')
+        
+        # Update Comment
+        if ('Comment' in missing_fields and enhanced_data.get('comment')):
+            paper_df.at[index, 'Comment'] = enhanced_data['comment']
+            updated_fields.append('Comment')
+        
+        # Update PDF Link
+        if ('PDF Link' in missing_fields and enhanced_data.get('pdf_link')):
+            paper_df.at[index, 'PDF Link'] = enhanced_data['pdf_link']
+            updated_fields.append('PDF Link')
+        
+        # Update Primary Category
+        if ('Primary Category' in missing_fields and enhanced_data.get('primary_category')):
+            paper_df.at[index, 'Primary Category'] = enhanced_data['primary_category']
+            updated_fields.append('Primary Category')
+        
+        # Update All Categories
+        if ('All Categories' in missing_fields and enhanced_data.get('all_categories')):
+            paper_df.at[index, 'All Categories'] = enhanced_data['all_categories']
+            updated_fields.append('All Categories')
+        
+        # Update Version
+        if ('Version' in missing_fields and enhanced_data.get('version')):
+            paper_df.at[index, 'Version'] = enhanced_data['version']
+            updated_fields.append('Version')
+        
+        # Update Date Published
+        if ('Date Published' in missing_fields and enhanced_data.get('date_published')):
+            paper_df.at[index, 'Date Published'] = enhanced_data['date_published']
+            updated_fields.append('Date Published')
+        
+        if updated_fields:
+            updated_count += 1
+        
+        # Small delay to be respectful to the API
+        import time
+        time.sleep(0.5)
+    
+    # Update the session state and save
+    st.session_state.paper = paper_df
+    save_paper(paper_df)
+    
+    # Clear progress indicators
+    progress_bar.empty()
+    status_text.empty()
+    
+    # Show results
+    st.success("✅ Auto-fill completed!")
+    st.info(f"📊 Successfully updated {updated_count} papers")
+    if failed_count > 0:
+        st.warning(f"⚠️ Failed to update {failed_count} papers")
+    
+    return updated_count, failed_count
 
 
 def create_topic_evolution(paper_df):
@@ -289,7 +534,11 @@ def calculate_research_impact_metrics(paper_df):
             "topic_concentration": 0,
             "reading_consistency": 0,
             "exploration_vs_exploitation": 0,
-            "research_velocity_trend": "stable"
+            "research_velocity_trend": "stable",
+            "arxiv_engagement": 0,
+            "category_diversity": 0,
+            "version_awareness": 0,
+            "publication_recency": 0
         }
 
     # Count unique topics and their frequency
@@ -369,6 +618,73 @@ def calculate_research_impact_metrics(paper_df):
     else:
         exploration_ratio = 0.5  # Default to neutral if not enough data
 
+    # NEW METRIC: ArXiv Engagement (percentage of papers from ArXiv)
+    arxiv_engagement = 0
+    if 'PDF Link' in paper_df.columns or 'Primary Category' in paper_df.columns:
+        arxiv_papers = 0
+        for idx, row in paper_df.iterrows():
+            # Check if it's an ArXiv paper by PDF link or Primary Category
+            is_arxiv = (
+                ('PDF Link' in row and pd.notna(row['PDF Link']) and 'arxiv.org' in str(row['PDF Link'])) or
+                ('Primary Category' in row and pd.notna(row['Primary Category']) and str(row['Primary Category']).strip())
+            )
+            if is_arxiv:
+                arxiv_papers += 1
+        arxiv_engagement = arxiv_papers / max(1, total_papers)
+
+    # NEW METRIC: Category Diversity (using Primary Category and All Categories)
+    category_diversity = 0
+    if 'Primary Category' in paper_df.columns:
+        primary_cats = set()
+        for cat in paper_df['Primary Category']:
+            if pd.notna(cat) and str(cat).strip():
+                primary_cats.add(str(cat).strip())
+        category_diversity = len(primary_cats) / max(1, total_papers)
+    
+    # Enhance with All Categories if available
+    if 'All Categories' in paper_df.columns:
+        all_cats = set()
+        for cats in paper_df['All Categories']:
+            if isinstance(cats, list):
+                all_cats.update(cats)
+            elif pd.notna(cats) and str(cats).strip():
+                cat_list = [c.strip() for c in str(cats).split(';')]
+                all_cats.update(cat_list)
+        if all_cats:
+            category_diversity = max(category_diversity, len(all_cats) / max(1, total_papers))
+
+    # NEW METRIC: Version Awareness (how often you read updated versions)
+    version_awareness = 0
+    if 'Version' in paper_df.columns:
+        versioned_papers = 0
+        for version in paper_df['Version']:
+            if pd.notna(version) and str(version).strip():
+                import re
+                # Check if version is v2 or higher (indicating you read updated papers)
+                match = re.search(r'v(\d+)', str(version))
+                if match and int(match.group(1)) > 1:
+                    versioned_papers += 1
+        version_awareness = versioned_papers / max(1, total_papers)
+
+    # NEW METRIC: Publication Recency (how recent are the papers you're reading)
+    publication_recency = 0
+    if 'Date Published' in paper_df.columns:
+        current_date = pd.Timestamp.now()
+        recent_papers = 0
+        total_dated_papers = 0
+        
+        for date_pub in paper_df['Date Published']:
+            if pd.notna(date_pub):
+                pub_date = pd.to_datetime(date_pub, errors='coerce')
+                if pd.notna(pub_date):
+                    total_dated_papers += 1
+                    # Consider papers from last 2 years as "recent"
+                    if (current_date - pub_date).days <= 730:
+                        recent_papers += 1
+        
+        if total_dated_papers > 0:
+            publication_recency = recent_papers / total_dated_papers
+
     # Determine research velocity trend - should use Date Read for actual reading trend
     velocity_trend = "stable"
     if 'Date Read' in paper_df.columns:
@@ -416,14 +732,19 @@ def calculate_research_impact_metrics(paper_df):
         "topic_concentration": round(topic_concentration, 2),
         "reading_consistency": round(reading_consistency, 2),
         "exploration_vs_exploitation": round(exploration_ratio, 2),
-        "research_velocity_trend": velocity_trend
+        "research_velocity_trend": velocity_trend,
+        "arxiv_engagement": round(arxiv_engagement, 2),
+        "category_diversity": round(category_diversity, 2),
+        "version_awareness": round(version_awareness, 2),
+        "publication_recency": round(publication_recency, 2)
     }
 
 
 def create_radar_chart(metrics):
     """Create a radar chart of research metrics."""
     categories = ['Knowledge Breadth', 'Knowledge Depth', 'Research Efficiency',
-                  'Reading Consistency', 'Topic Focus', 'Exploration']
+                  'Reading Consistency', 'Topic Focus', 'Exploration', 
+                  'ArXiv Engagement', 'Category Diversity', 'Version Awareness', 'Publication Recency']
 
     values = [
         metrics["knowledge_breadth"] * 5,  # Scale to 0-5
@@ -431,7 +752,11 @@ def create_radar_chart(metrics):
         metrics["research_efficiency"] * 5,
         metrics["reading_consistency"] * 5,
         metrics["topic_concentration"] * 5,
-        metrics["exploration_vs_exploitation"] * 5
+        metrics["exploration_vs_exploitation"] * 5,
+        metrics["arxiv_engagement"] * 5,  # New metric
+        metrics["category_diversity"] * 5,  # New metric
+        metrics["version_awareness"] * 5,  # New metric
+        metrics["publication_recency"] * 5  # New metric
     ]
 
     # Close the loop for the radar chart
@@ -645,9 +970,9 @@ def load_paper():
     Returns a DataFrame with proper column structure.
     """
     try:
-        # First try normal loading
+        # First try normal loading with UTF-8 encoding
         if os.path.exists(PAPER_FILE):
-            with open(PAPER_FILE, 'r') as f:
+            with open(PAPER_FILE, 'r', encoding='utf-8') as f:
                 try:
                     paper_dict = json.load(f)
                 except json.JSONDecodeError:
@@ -672,7 +997,9 @@ def load_paper():
         # Initialize DataFrame with required columns if empty
         if paper_df.empty:
             paper_df = pd.DataFrame(columns=[
-                'Title', 'Reading Status', 'Date Added', 'Date Published', 'Date Read', 'Link', 'Topics', 'Description'
+                'Title', 'Reading Status', 'Date Added', 'Date Published', 'Date Read', 'Date Updated', 
+                'Link', 'PDF Link', 'Topics', 'All Categories', 'Primary Category', 'Authors', 
+                'Description', 'Comment', 'Version'
             ])
 
         # Ensure all required columns exist
@@ -682,25 +1009,35 @@ def load_paper():
             'Date Added': str,
             'Date Published': str,  # ArXiv publication date
             'Date Read': str,       # Date when user finished reading
+            'Date Updated': str,    # ArXiv last update date
             'Link': str,
-            'Topics': list,
-            'Description': str
+            'PDF Link': str,        # Direct PDF link
+            'Topics': list,         # Primary categories (backward compatibility)
+            'All Categories': list, # All ArXiv categories including subcategories
+            'Primary Category': str,# Primary ArXiv category
+            'Authors': list,        # List of authors
+            'Description': str,
+            'Comment': str,         # ArXiv comment field
+            'Version': str          # ArXiv version (v1, v2, etc.)
         }
 
         for col, dtype in required_columns.items():
             if col not in paper_df.columns:
                 if dtype == list:
                     paper_df[col] = [[] for _ in range(len(paper_df))]
-                elif col in ['Date Published', 'Date Read']:
-                    paper_df[col] = ''  # Empty string for optional date fields
+                elif col in ['Date Published', 'Date Read', 'Date Updated', 'PDF Link', 'Primary Category', 'Comment', 'Version']:
+                    paper_df[col] = ''  # Empty string for optional fields
                 else:
                     paper_df[col] = dtype()
 
-        # Clean up Topics column
-        paper_df['Topics'] = paper_df['Topics'].apply(
-            lambda x: [t.strip() for t in (x if isinstance(x, list) else
-                                           (x.split(',') if isinstance(x, str) and x else []))]
-        )
+        # Clean up list columns
+        list_columns = ['Topics', 'All Categories', 'Authors']
+        for col in list_columns:
+            if col in paper_df.columns:
+                paper_df[col] = paper_df[col].apply(
+                    lambda x: [t.strip() for t in (x if isinstance(x, list) else
+                                                   (x.split(',') if isinstance(x, str) and x else []))]
+                )
 
         # Ensure Date Added is in correct format
         paper_df['Date Added'] = paper_df['Date Added'].apply(
@@ -784,8 +1121,8 @@ def save_paper(paper_df):
             )
     
     paper_dict = paper_df.to_dict('records')
-    with open(PAPER_FILE, 'w') as f:
-        json.dump(paper_dict, f, default=serialize_dates)
+    with open(PAPER_FILE, 'w', encoding='utf-8') as f:
+        json.dump(paper_dict, f, default=serialize_dates, ensure_ascii=False, indent=2)
 
 
 def reset_form():
@@ -800,7 +1137,9 @@ def reset_form():
     st.session_state['edit_description'] = ""
 
 
-def add_paper(title, reading_status, date_added, link, topics, description, date_published='', date_read=''):
+def add_paper(title, reading_status, date_added, link, topics, description, date_published='', date_read='', 
+              authors=None, all_categories=None, primary_category='', pdf_link='', comment='', 
+              version='', date_updated=''):
     # Check if paper with same title exists (case-insensitive)
     existing_titles = st.session_state.paper['Title'].str.lower()
     if title.lower() in existing_titles.values:
@@ -809,6 +1148,8 @@ def add_paper(title, reading_status, date_added, link, topics, description, date
 
     # If title doesn't exist, proceed with adding the paper
     topics_list = topics if isinstance(topics, list) else []
+    authors_list = authors if isinstance(authors, list) else []
+    all_categories_list = all_categories if isinstance(all_categories, list) else []
     
     # Ensure dates are in proper string format
     date_added = format_date_for_storage(date_added)
@@ -818,6 +1159,9 @@ def add_paper(title, reading_status, date_added, link, topics, description, date
         date_published = date_added
     else:
         date_published = format_date_for_storage(date_published)
+    
+    # Format update date if provided
+    date_updated = format_date_for_storage(date_updated) if date_updated else ''
     
     # Automatically set Date Read to today if status is "Read"
     if reading_status == 'Read':
@@ -834,9 +1178,16 @@ def add_paper(title, reading_status, date_added, link, topics, description, date
         'Date Added': [date_added],
         'Date Published': [date_published],
         'Date Read': [date_read],
+        'Date Updated': [date_updated],
         'Link': [link],
+        'PDF Link': [pdf_link],
         'Topics': [topics_list],
-        'Description': [description]
+        'All Categories': [all_categories_list],
+        'Primary Category': [primary_category],
+        'Authors': [authors_list],
+        'Description': [description],
+        'Comment': [comment],
+        'Version': [version]
     })
     st.session_state.paper = pd.concat([st.session_state.paper, new_paper], ignore_index=True)
     st.session_state.paper = st.session_state.paper.sort_values('Title')
@@ -918,13 +1269,22 @@ def analyze_reading_habits(paper_df):
             "topic_distribution": {},
             "monthly_activity": {},
             "completion_rate": 0,
-            "recent_topics": []
+            "recent_topics": [],
+            "author_engagement": {},
+            "category_distribution": {},
+            "version_distribution": {},
+            "publication_timeline": {},
+            "arxiv_statistics": {}
         }
 
     # Ensure date format is consistent for both Date Added and Date Read
     paper_df['Date Added'] = pd.to_datetime(paper_df['Date Added'], errors='coerce')
     if 'Date Read' in paper_df.columns:
         paper_df['Date Read'] = pd.to_datetime(paper_df['Date Read'], errors='coerce')
+    if 'Date Published' in paper_df.columns:
+        paper_df['Date Published'] = pd.to_datetime(paper_df['Date Published'], errors='coerce')
+    if 'Date Updated' in paper_df.columns:
+        paper_df['Date Updated'] = pd.to_datetime(paper_df['Date Updated'], errors='coerce')
 
     # Basic counts
     total_papers = len(paper_df)
@@ -967,6 +1327,104 @@ def analyze_reading_habits(paper_df):
 
     # Sort topics by frequency
     topic_distribution = dict(topic_counts.most_common())
+
+    # NEW: Author engagement analysis
+    author_engagement = {}
+    if 'Authors' in paper_df.columns:
+        author_counts = Counter()
+        for authors in paper_df['Authors']:
+            if isinstance(authors, list):
+                for author in authors:
+                    author_counts[author] += 1
+            elif isinstance(authors, str) and authors.strip():
+                author_list = [author.strip() for author in authors.split(',')]
+                for author in author_list:
+                    author_counts[author] += 1
+        
+        author_engagement = {
+            "most_read_authors": dict(author_counts.most_common(10)),
+            "unique_authors": len(author_counts),
+            "avg_authors_per_paper": sum(author_counts.values()) / max(1, total_papers)
+        }
+
+    # NEW: Category distribution analysis
+    category_distribution = {}
+    if 'Primary Category' in paper_df.columns:
+        primary_cat_counts = Counter()
+        for cat in paper_df['Primary Category']:
+            if pd.notna(cat) and str(cat).strip():
+                primary_cat_counts[str(cat).strip()] += 1
+        
+        category_distribution["primary_categories"] = dict(primary_cat_counts.most_common())
+    
+    if 'All Categories' in paper_df.columns:
+        all_cat_counts = Counter()
+        for cats in paper_df['All Categories']:
+            if isinstance(cats, list):
+                for cat in cats:
+                    all_cat_counts[cat] += 1
+            elif pd.notna(cats) and str(cats).strip():
+                cat_list = [c.strip() for c in str(cats).split(';')]
+                for cat in cat_list:
+                    all_cat_counts[cat] += 1
+        
+        category_distribution["all_categories"] = dict(all_cat_counts.most_common(15))
+
+    # NEW: Version distribution analysis
+    version_distribution = {}
+    if 'Version' in paper_df.columns:
+        version_counts = Counter()
+        for version in paper_df['Version']:
+            if pd.notna(version) and str(version).strip():
+                version_counts[str(version)] += 1
+        
+        # Calculate updated papers percentage
+        updated_papers = sum(1 for v in version_counts.keys() 
+                           if v and any(char.isdigit() and int(char) > 1 for char in v))
+        
+        version_distribution = {
+            "version_counts": dict(version_counts.most_common()),
+            "updated_papers_percentage": round((updated_papers / max(1, total_papers)) * 100, 1)
+        }
+
+    # NEW: Publication timeline analysis
+    publication_timeline = {}
+    if 'Date Published' in paper_df.columns:
+        pub_papers = paper_df[paper_df['Date Published'].notna()]
+        if len(pub_papers) > 0:
+            pub_papers['Pub Year'] = pub_papers['Date Published'].dt.year
+            yearly_pubs = pub_papers.groupby('Pub Year').size()
+            
+            publication_timeline = {
+                "papers_by_year": yearly_pubs.to_dict(),
+                "earliest_paper": int(yearly_pubs.index.min()) if len(yearly_pubs) > 0 else None,
+                "latest_paper": int(yearly_pubs.index.max()) if len(yearly_pubs) > 0 else None,
+                "avg_paper_age_years": round((pd.Timestamp.now() - pub_papers['Date Published'].mean()).days / 365.25, 1)
+            }
+
+    # NEW: ArXiv-specific statistics
+    arxiv_statistics = {}
+    arxiv_papers = 0
+    pdf_available = 0
+    
+    # Count ArXiv papers and PDFs
+    for idx, row in paper_df.iterrows():
+        is_arxiv = (
+            ('PDF Link' in row and pd.notna(row['PDF Link']) and 'arxiv.org' in str(row['PDF Link'])) or
+            ('Primary Category' in row and pd.notna(row['Primary Category']) and str(row['Primary Category']).strip())
+        )
+        if is_arxiv:
+            arxiv_papers += 1
+        
+        if 'PDF Link' in row and pd.notna(row['PDF Link']) and str(row['PDF Link']).strip():
+            pdf_available += 1
+    
+    arxiv_statistics = {
+        "arxiv_papers": arxiv_papers,
+        "arxiv_percentage": round((arxiv_papers / max(1, total_papers)) * 100, 1),
+        "pdf_available": pdf_available,
+        "pdf_percentage": round((pdf_available / max(1, total_papers)) * 100, 1)
+    }
 
     # Monthly activity should reflect actual reading when possible
     if 'Date Read' in paper_df.columns:
@@ -1030,7 +1488,12 @@ def analyze_reading_habits(paper_df):
         "topic_distribution": topic_distribution,
         "monthly_activity": monthly_activity,
         "completion_rate": round(completion_rate, 1),
-        "recent_topics": recent_topics
+        "recent_topics": recent_topics,
+        "author_engagement": author_engagement,
+        "category_distribution": category_distribution,
+        "version_distribution": version_distribution,
+        "publication_timeline": publication_timeline,
+        "arxiv_statistics": arxiv_statistics
     }
 
 
@@ -2428,6 +2891,14 @@ def create_topic_network(paper_df):
     return fig
 
 def main():
+    # Initialize session state first
+    if 'paper' not in st.session_state:
+        st.session_state.paper = load_paper()
+    
+    # Initialize success message state if not exists
+    if 'success_message' not in st.session_state:
+        st.session_state.success_message = None
+
     # Set page config with a fun emoji and custom theme
     st.set_page_config(
         page_title="📚 Research Reading Tracker",
@@ -2479,14 +2950,7 @@ def main():
         st.markdown(f"### ✨ Daily Inspiration")
         st.markdown(f"*{random.choice(READING_QUOTES)}*")
 
-    if 'paper' not in st.session_state:
-        st.session_state.paper = load_paper()
-
-        # Initialize success message state if not exists
-    if 'success_message' not in st.session_state:
-        st.session_state.success_message = None
-
-    tab1, tab2, tab3 = st.tabs(["➕ Add Paper", "📋 View Collection", "📊 Analysis"])
+    tab1, tab2, tab3, tab4 = st.tabs(["➕ Add Paper", "📋 View Collection", "📊 Analysis", "🔧 Auto-Fill"])
 
     with tab1:
         # Display success message if exists
@@ -2509,16 +2973,22 @@ def main():
 
             if fetch_submitted:
                 if arxiv_url:
-                    paper_details, error = fetch_paper_details(arxiv_url)
-                    if error:
-                        st.error(f"Error: {error}")
+                    result = fetch_paper_details(arxiv_url)
+                    if result is None or len(result) != 2:
+                        st.error("Error: Unable to fetch paper details")
                     else:
-                        st.session_state['paper_details'] = paper_details
-                        st.session_state['title'] = paper_details['title']
-                        st.session_state['link'] = paper_details['link']
-                        st.session_state['description'] = paper_details['description']
-                        st.session_state.success_message = "📄 Paper details fetched successfully!"
-                        st.rerun()
+                        paper_details, error = result
+                        if error:
+                            st.error(f"Error: {error}")
+                        elif paper_details:
+                            st.session_state['paper_details'] = paper_details
+                            st.session_state['title'] = paper_details['title']
+                            st.session_state['link'] = paper_details['link']
+                            st.session_state['description'] = paper_details['description']
+                            st.session_state.success_message = "📄 Paper details fetched successfully!"
+                            st.rerun()
+                        else:
+                            st.error("Error: No paper details returned")
                 else:
                     st.warning("Please enter an arXiv URL")
 
@@ -2650,6 +3120,7 @@ def main():
 
         # Enhanced filters section
         with st.expander("🔍 Advanced Filters", expanded=True):
+            # Row 1: Basic filters
             filter_col1, filter_col2, filter_col3 = st.columns([1, 1, 1])
 
             with filter_col1:
@@ -2665,14 +3136,102 @@ def main():
                 text_filter = st.text_input("🔍 Search by Title/Description/Topic",
                                             placeholder="Enter keywords to search...")
 
-        date_range = None
+            # Row 2: ArXiv-specific filters
+            st.markdown("##### 🔬 ArXiv Filters")
+            arxiv_col1, arxiv_col2, arxiv_col3 = st.columns([1, 1, 1])
+            
+            with arxiv_col1:
+                # Authors filter
+                all_authors = set()
+                for authors in st.session_state.paper.get('Authors', []):
+                    if isinstance(authors, list):
+                        all_authors.update(authors)
+                    elif isinstance(authors, str) and authors.strip():
+                        all_authors.update([author.strip() for author in authors.split(',')])
+                
+                if all_authors:
+                    author_filter = st.multiselect("👥 Filter by Authors", 
+                                                   options=["All"] + sorted(list(all_authors)))
+                else:
+                    author_filter = []
+
+            with arxiv_col2:
+                # Primary Category filter
+                all_primary_cats = set()
+                for cat in st.session_state.paper.get('Primary Category', []):
+                    if isinstance(cat, str) and cat.strip():
+                        all_primary_cats.add(cat.strip())
+                
+                if all_primary_cats:
+                    primary_cat_filter = st.multiselect("📊 Filter by Primary Category",
+                                                        options=["All"] + sorted(list(all_primary_cats)))
+                else:
+                    primary_cat_filter = []
+
+            with arxiv_col3:
+                # Version filter
+                all_versions = set()
+                for version in st.session_state.paper.get('Version', []):
+                    if isinstance(version, str) and version.strip():
+                        all_versions.add(version.strip())
+                
+                if all_versions:
+                    version_filter = st.multiselect("🔄 Filter by Version",
+                                                    options=["All"] + sorted(list(all_versions)))
+                else:
+                    version_filter = []
+
+            # Row 3: Additional filters
+            additional_col1, additional_col2, additional_col3 = st.columns([1, 1, 1])
+            
+            with additional_col1:
+                # Date range filters
+                date_filter_type = st.selectbox("📅 Date Filter Type", 
+                                               ["None", "Date Added", "Date Published", "Date Updated"])
+                
+            with additional_col2:
+                # PDF availability filter
+                pdf_filter = st.selectbox("📄 PDF Availability", 
+                                         ["All", "Has PDF Link", "No PDF Link"])
+                
+            with additional_col3:
+                # All Categories filter (for papers with multiple categories)
+                all_categories = set()
+                for categories in st.session_state.paper.get('All Categories', []):
+                    if isinstance(categories, list):
+                        all_categories.update(categories)
+                    elif isinstance(categories, str) and categories.strip():
+                        all_categories.update([cat.strip() for cat in categories.split(';')])
+                
+                if all_categories:
+                    all_cat_filter = st.multiselect("📚 Filter by All Categories",
+                                                    options=["All"] + sorted(list(all_categories)))
+                else:
+                    all_cat_filter = []
+
+            # Date range selector (only shown if date filter is selected)
+            date_range = None
+            if date_filter_type != "None":
+                date_range = st.date_input(f"Select {date_filter_type} Range",
+                                         value=None,
+                                         help=f"Filter papers by {date_filter_type.lower()}")
+                if isinstance(date_range, tuple) and len(date_range) == 2:
+                    pass  # Valid range
+                else:
+                    date_range = None
 
         # Sorting options
         sort_col1, sort_col2 = st.columns([1, 1])
         with sort_col1:
-            sort_by = st.selectbox("🔄 Sort by", ["Date Added", "Date Read", "Title", "Reading Status", "Topics Count"])
+            sort_by = st.selectbox("🔄 Sort by", 
+                                 ["Date Added", "Date Read", "Date Published", "Date Updated", 
+                                  "Title", "Reading Status", "Topics Count", "Primary Category", "Version"])
             if sort_by == "Date Read":
                 st.caption("📖 Sorts by reading completion date (papers without read dates appear last)")
+            elif sort_by == "Date Published":
+                st.caption("📅 Sorts by original publication date on ArXiv")
+            elif sort_by == "Date Updated":
+                st.caption("🔄 Sorts by last update date on ArXiv")
         with sort_col2:
             sort_direction = st.radio("⬆️⬇️ Order", ["Descending", "Ascending"], horizontal=True)
 
@@ -2689,21 +3248,98 @@ def main():
                 papers_to_display['Topics'].apply(
                     lambda x: any(topic in x for topic in topic_filter) if isinstance(x, list) else False)]
 
-        # Apply date range filter
-        if date_range and len(date_range) == 2:
-            papers_to_display['Date Added'] = pd.to_datetime(papers_to_display['Date Added'])
-            start_date, end_date = date_range
-            papers_to_display = papers_to_display[(papers_to_display['Date Added'].dt.date >= start_date) &
-                                                  (papers_to_display['Date Added'].dt.date <= end_date)]
-
-        # Apply text filter
-        if text_filter:
+        # Apply author filter
+        if author_filter and "All" not in author_filter:
+            def author_match(authors_data):
+                if isinstance(authors_data, list):
+                    return any(author in author_filter for author in authors_data)
+                elif isinstance(authors_data, str) and authors_data.strip():
+                    author_list = [author.strip() for author in authors_data.split(',')]
+                    return any(author in author_filter for author in author_list)
+                return False
+            
             papers_to_display = papers_to_display[
+                papers_to_display.get('Authors', pd.Series(dtype='object')).apply(author_match)]
+
+        # Apply primary category filter
+        if primary_cat_filter and "All" not in primary_cat_filter:
+            papers_to_display = papers_to_display[
+                papers_to_display.get('Primary Category', pd.Series(dtype='object')).isin(primary_cat_filter)]
+
+        # Apply version filter
+        if version_filter and "All" not in version_filter:
+            papers_to_display = papers_to_display[
+                papers_to_display.get('Version', pd.Series(dtype='object')).isin(version_filter)]
+
+        # Apply all categories filter
+        if all_cat_filter and "All" not in all_cat_filter:
+            def all_categories_match(categories_data):
+                if isinstance(categories_data, list):
+                    return any(cat in all_cat_filter for cat in categories_data)
+                elif isinstance(categories_data, str) and categories_data.strip():
+                    cat_list = [cat.strip() for cat in categories_data.split(';')]
+                    return any(cat in all_cat_filter for cat in cat_list)
+                return False
+            
+            papers_to_display = papers_to_display[
+                papers_to_display.get('All Categories', pd.Series(dtype='object')).apply(all_categories_match)]
+
+        # Apply PDF availability filter
+        if pdf_filter != "All":
+            if pdf_filter == "Has PDF Link":
+                papers_to_display = papers_to_display[
+                    papers_to_display.get('PDF Link', pd.Series(dtype='object')).notna() & 
+                    (papers_to_display.get('PDF Link', pd.Series(dtype='object')) != '')]
+            elif pdf_filter == "No PDF Link":
+                papers_to_display = papers_to_display[
+                    papers_to_display.get('PDF Link', pd.Series(dtype='object')).isna() | 
+                    (papers_to_display.get('PDF Link', pd.Series(dtype='object')) == '')]
+
+        # Apply date range filter based on selected date type
+        if date_range and len(date_range) == 2 and date_filter_type != "None":
+            date_column = date_filter_type
+            if date_column in papers_to_display.columns:
+                papers_to_display[date_column] = pd.to_datetime(papers_to_display[date_column], errors='coerce')
+                start_date, end_date = date_range
+                papers_to_display = papers_to_display[
+                    (papers_to_display[date_column].dt.date >= start_date) &
+                    (papers_to_display[date_column].dt.date <= end_date)]
+
+        # Apply text filter (enhanced to include new fields)
+        if text_filter:
+            text_filter_conditions = (
                 papers_to_display['Title'].str.contains(text_filter, case=False, na=False) |
                 papers_to_display['Description'].str.contains(text_filter, case=False, na=False) |
                 papers_to_display['Topics'].apply(
                     lambda x: any(text_filter.lower() in t.lower() for t in x if isinstance(x, list)))
-                ]
+            )
+            
+            # Add author search
+            if 'Authors' in papers_to_display.columns:
+                def author_text_search(authors_data):
+                    if isinstance(authors_data, list):
+                        return any(text_filter.lower() in author.lower() for author in authors_data)
+                    elif isinstance(authors_data, str):
+                        return text_filter.lower() in authors_data.lower()
+                    return False
+                text_filter_conditions |= papers_to_display['Authors'].apply(author_text_search)
+            
+            # Add category searches
+            for col in ['Primary Category', 'All Categories']:
+                if col in papers_to_display.columns:
+                    def category_text_search(cat_data):
+                        if isinstance(cat_data, list):
+                            return any(text_filter.lower() in cat.lower() for cat in cat_data)
+                        elif isinstance(cat_data, str):
+                            return text_filter.lower() in cat_data.lower()
+                        return False
+                    text_filter_conditions |= papers_to_display[col].apply(category_text_search)
+            
+            # Add comment search
+            if 'Comment' in papers_to_display.columns:
+                text_filter_conditions |= papers_to_display['Comment'].str.contains(text_filter, case=False, na=False)
+                
+            papers_to_display = papers_to_display[text_filter_conditions]
 
         # Calculate topics count for sorting
         papers_to_display['Topics Count'] = papers_to_display['Topics'].apply(
@@ -2723,6 +3359,22 @@ def main():
             else:
                 st.warning("Date Read column not available. Please ensure papers have reading completion dates.")
                 papers_to_display = papers_to_display.sort_values('Date Added', ascending=ascending)
+        elif sort_by == "Date Published":
+            # Handle Date Published sorting
+            if 'Date Published' in papers_to_display.columns:
+                papers_to_display['Date Published'] = pd.to_datetime(papers_to_display['Date Published'], errors='coerce')
+                papers_to_display = papers_to_display.sort_values('Date Published', ascending=ascending, na_position='last')
+            else:
+                st.warning("Date Published column not available.")
+                papers_to_display = papers_to_display.sort_values('Date Added', ascending=ascending)
+        elif sort_by == "Date Updated":
+            # Handle Date Updated sorting
+            if 'Date Updated' in papers_to_display.columns:
+                papers_to_display['Date Updated'] = pd.to_datetime(papers_to_display['Date Updated'], errors='coerce')
+                papers_to_display = papers_to_display.sort_values('Date Updated', ascending=ascending, na_position='last')
+            else:
+                st.warning("Date Updated column not available.")
+                papers_to_display = papers_to_display.sort_values('Date Added', ascending=ascending)
         elif sort_by == "Title":
             papers_to_display = papers_to_display.sort_values('Title', ascending=ascending)
         elif sort_by == "Reading Status":
@@ -2733,6 +3385,28 @@ def main():
             papers_to_display = papers_to_display.sort_values('Status Order', ascending=True)
         elif sort_by == "Topics Count":
             papers_to_display = papers_to_display.sort_values('Topics Count', ascending=ascending)
+        elif sort_by == "Primary Category":
+            if 'Primary Category' in papers_to_display.columns:
+                papers_to_display = papers_to_display.sort_values('Primary Category', ascending=ascending, na_position='last')
+            else:
+                st.warning("Primary Category column not available.")
+                papers_to_display = papers_to_display.sort_values('Title', ascending=ascending)
+        elif sort_by == "Version":
+            if 'Version' in papers_to_display.columns:
+                # Sort versions numerically (v1, v2, v3, etc.)
+                def version_sort_key(version):
+                    if pd.isna(version) or not isinstance(version, str):
+                        return 0
+                    # Extract number from version string (e.g., 'v2' -> 2)
+                    import re
+                    match = re.search(r'v(\d+)', version)
+                    return int(match.group(1)) if match else 0
+                
+                papers_to_display['Version Sort Key'] = papers_to_display['Version'].apply(version_sort_key)
+                papers_to_display = papers_to_display.sort_values('Version Sort Key', ascending=ascending, na_position='last')
+            else:
+                st.warning("Version column not available.")
+                papers_to_display = papers_to_display.sort_values('Title', ascending=ascending)
 
         # Paper edit form
         if hasattr(st.session_state, 'edit_mode') and st.session_state.edit_mode and hasattr(st.session_state,
@@ -3063,6 +3737,35 @@ def main():
                         'description': 'Balance between exploring new topics vs deepening existing ones',
                         'optimal_range': '0.3 - 0.7',
                         'emoji': '🗺️'
+                    },
+                    # NEW ARXIV METRICS
+                    {
+                        'name': 'ArXiv Engagement',
+                        'value': impact_metrics['arxiv_engagement'],
+                        'description': 'Percentage of papers from ArXiv - indicates engagement with cutting-edge research',
+                        'optimal_range': '0.3 - 0.8',
+                        'emoji': '🔬'
+                    },
+                    {
+                        'name': 'Category Diversity',
+                        'value': impact_metrics['category_diversity'],
+                        'description': 'Variety of ArXiv categories in your research - higher values show interdisciplinary interests',
+                        'optimal_range': '0.2 - 0.6',
+                        'emoji': '🎨'
+                    },
+                    {
+                        'name': 'Version Awareness',
+                        'value': impact_metrics['version_awareness'],
+                        'description': 'How often you read updated versions of papers - shows attention to evolving research',
+                        'optimal_range': '0.1 - 0.4',
+                        'emoji': '🔄'
+                    },
+                    {
+                        'name': 'Publication Recency',
+                        'value': impact_metrics['publication_recency'],
+                        'description': 'How recent the papers you read are - higher values indicate focus on latest research',
+                        'optimal_range': '0.4 - 0.8',
+                        'emoji': '📅'
                     }
                 ]
                 
@@ -5065,13 +5768,256 @@ def main():
                     st.markdown("• Add papers consistently over several weeks")
                     st.markdown("• Mark reading status accurately")
                     st.markdown("• Include dates when adding papers")
+
+        # NEW ARXIV-SPECIFIC ANALYSIS SECTION
+        st.subheader("🔬 ArXiv Research Analysis")
+        
+        arxiv_tabs = st.tabs(["📊 ArXiv Statistics", "👥 Author Analysis", "📚 Category Distribution", "📅 Publication Timeline"])
+        
+        with arxiv_tabs[0]:
+            st.markdown("#### ArXiv Engagement Metrics")
+            arxiv_stats = analysis_data.get('arxiv_statistics', {})
+            
+            if arxiv_stats.get('arxiv_papers', 0) > 0:
+                col1, col2, col3 = st.columns(3)
+                
+                with col1:
+                    st.metric("ArXiv Papers", f"{arxiv_stats['arxiv_papers']}")
+                    st.metric("ArXiv Engagement", f"{arxiv_stats['arxiv_percentage']:.1f}%")
+                    
+                with col2:
+                    st.metric("PDF Available", f"{arxiv_stats['pdf_available']}")
+                    st.metric("PDF Availability", f"{arxiv_stats['pdf_percentage']:.1f}%")
+                    
+                with col3:
+                    # Version statistics
+                    version_dist = analysis_data.get('version_distribution', {})
+                    if version_dist:
+                        st.metric("Updated Papers", f"{version_dist.get('updated_papers_percentage', 0):.1f}%")
+                    else:
+                        st.metric("Updated Papers", "N/A")
+                        
+                # ArXiv engagement insights
+                if arxiv_stats['arxiv_percentage'] > 70:
+                    st.success("🌟 **High ArXiv Engagement**: You're very connected to cutting-edge research!")
+                elif arxiv_stats['arxiv_percentage'] > 40:
+                    st.info("📈 **Good ArXiv Engagement**: Solid connection to recent research developments")
+                else:
+                    st.info("📚 **Mixed Sources**: You use diverse paper sources beyond ArXiv")
+                    
+            else:
+                st.info("No ArXiv papers detected. Add ArXiv papers or run auto-fill to see ArXiv-specific metrics.")
+        
+        with arxiv_tabs[1]:
+            st.markdown("#### Author Engagement Analysis")
+            author_engagement = analysis_data.get('author_engagement', {})
+            
+            if author_engagement.get('most_read_authors'):
+                # Display top authors
+                st.markdown("##### 🏆 Most Read Authors")
+                top_authors = list(author_engagement['most_read_authors'].items())[:10]
+                
+                # Create a horizontal bar chart for top authors
+                author_names = [author for author, _ in top_authors]
+                author_counts = [count for _, count in top_authors]
+                
+                author_fig = px.bar(
+                    x=author_counts, 
+                    y=author_names,
+                    orientation='h',
+                    title="Top Authors by Paper Count",
+                    labels={'x': 'Number of Papers', 'y': 'Author'},
+                    color=author_counts,
+                    color_continuous_scale='Blues'
+                )
+                author_fig.update_layout(height=400, yaxis={'categoryorder': 'total ascending'})
+                st.plotly_chart(author_fig, use_container_width=True)
+                
+                # Author engagement metrics
+                col1, col2 = st.columns(2)
+                with col1:
+                    st.metric("Unique Authors", author_engagement.get('unique_authors', 0))
+                with col2:
+                    st.metric("Avg Authors/Paper", f"{author_engagement.get('avg_authors_per_paper', 0):.1f}")
+                    
+            else:
+                st.info("No author information available. Run auto-fill to extract author data from ArXiv papers.")
+                
+        with arxiv_tabs[2]:
+            st.markdown("#### Research Category Analysis")
+            category_dist = analysis_data.get('category_distribution', {})
+            
+            if category_dist:
+                if 'primary_categories' in category_dist and category_dist['primary_categories']:
+                    st.markdown("##### 📊 Primary ArXiv Categories")
+                    primary_cats = category_dist['primary_categories']
+                    
+                    # Create pie chart for primary categories
+                    cat_fig = px.pie(
+                        names=list(primary_cats.keys()),
+                        values=list(primary_cats.values()),
+                        title="Distribution by Primary ArXiv Category"
+                    )
+                    cat_fig.update_traces(
+                        textposition='inside',
+                        textinfo='percent+label',
+                        hovertemplate='<b>%{label}</b><br>Papers: %{value}<br>%{percent}<extra></extra>'
+                    )
+                    st.plotly_chart(cat_fig, use_container_width=True)
+                    
+                if 'all_categories' in category_dist and category_dist['all_categories']:
+                    st.markdown("##### 🎨 All ArXiv Categories")
+                    all_cats = category_dist['all_categories']
+                    
+                    # Create horizontal bar chart for all categories
+                    cat_names = list(all_cats.keys())[:15]  # Top 15
+                    cat_counts = list(all_cats.values())[:15]
+                    
+                    all_cat_fig = px.bar(
+                        x=cat_counts,
+                        y=cat_names,
+                        orientation='h',
+                        title="Papers by All ArXiv Categories (Top 15)",
+                        labels={'x': 'Number of Papers', 'y': 'Category'},
+                        color=cat_counts,
+                        color_continuous_scale='Viridis'
+                    )
+                    all_cat_fig.update_layout(height=500, yaxis={'categoryorder': 'total ascending'})
+                    st.plotly_chart(all_cat_fig, use_container_width=True)
+            else:
+                st.info("No category information available. Run auto-fill to extract category data from ArXiv papers.")
+                
+        with arxiv_tabs[3]:
+            st.markdown("#### Publication Timeline Analysis")
+            pub_timeline = analysis_data.get('publication_timeline', {})
+            
+            if pub_timeline and 'papers_by_year' in pub_timeline:
+                # Publication timeline visualization
+                years = list(pub_timeline['papers_by_year'].keys())
+                counts = list(pub_timeline['papers_by_year'].values())
+                
+                timeline_fig = px.bar(
+                    x=years,
+                    y=counts,
+                    title="Papers by Publication Year",
+                    labels={'x': 'Publication Year', 'y': 'Number of Papers'},
+                    color=counts,
+                    color_continuous_scale='plasma'
+                )
+                timeline_fig.update_layout(height=400)
+                st.plotly_chart(timeline_fig, use_container_width=True)
+                
+                # Publication metrics
+                col1, col2, col3 = st.columns(3)
+                with col1:
+                    if pub_timeline.get('earliest_paper'):
+                        st.metric("Earliest Paper", str(pub_timeline['earliest_paper']))
+                with col2:
+                    if pub_timeline.get('latest_paper'):
+                        st.metric("Latest Paper", str(pub_timeline['latest_paper']))
+                with col3:
+                    if pub_timeline.get('avg_paper_age_years'):
+                        st.metric("Avg Paper Age", f"{pub_timeline['avg_paper_age_years']:.1f} years")
+                        
+                # Publication recency insights
+                if pub_timeline.get('avg_paper_age_years', 0) < 2:
+                    st.success("🚀 **Very Current**: You read very recent research!")
+                elif pub_timeline.get('avg_paper_age_years', 0) < 5:
+                    st.info("📅 **Recent Focus**: Good balance of recent and established research")
+                else:
+                    st.info("📚 **Historical Perspective**: You include foundational and historical papers")
+            else:
+                st.info("No publication date information available. Run auto-fill to extract publication dates from ArXiv papers.")
+
+    # New Auto-Fill Tab
+    with tab4:
+        st.markdown("# 🔧 Auto-Fill Missing Information")
+        st.markdown("---")
+        
+        if 'paper' not in st.session_state or st.session_state.paper.empty:
+            st.info("📝 No papers found! Add some papers first to use the auto-fill feature.")
         else:
-            st.info("Start adding papers to receive personalized research recommendations!")
-            st.markdown("**🚀 Getting Started:**")
-            st.markdown("• Add your first paper using the 'Add Paper' tab")
-            st.markdown("• Include relevant topics and descriptions")
-            st.markdown("• Mark papers as 'Read' when completed")
-            st.markdown("• Come back to see your research insights grow!")
+            # Count papers that need updating
+            paper_df = st.session_state.paper.copy()
+            arxiv_papers = []
+            papers_needing_update = []
+            
+            for index, paper in paper_df.iterrows():
+                if is_arxiv_url(paper.get('Link')):
+                    arxiv_papers.append(paper)
+                    needs_upd, missing_fields = needs_paper_update(paper)
+                    if needs_upd:
+                        papers_needing_update.append((paper, missing_fields))
+            
+            st.markdown("### 📊 Current Status")
+            
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total Papers", len(paper_df))
+            with col2:
+                st.metric("ArXiv Papers", len(arxiv_papers))
+            with col3:
+                st.metric("Need Updates", len(papers_needing_update))
+            with col4:
+                completion_rate = ((len(arxiv_papers) - len(papers_needing_update)) / max(1, len(arxiv_papers))) * 100
+                st.metric("Completion Rate", f"{completion_rate:.1f}%")
+            
+            st.markdown("---")
+            
+            if not papers_needing_update:
+                st.success("🎉 All your ArXiv papers already have complete information!")
+            else:
+                st.markdown("### 🔍 Papers That Can Be Enhanced")
+                
+                st.info(f"Found **{len(papers_needing_update)}** ArXiv papers that can be enhanced with additional information from the ArXiv API.")
+                
+                # Show what information can be auto-filled
+                st.markdown("#### Available Information to Auto-Fill:")
+                info_cols = st.columns(2)
+                with info_cols[0]:
+                    st.markdown("""
+                    **📚 Paper Details:**
+                    • **Authors** - Complete author list
+                    • **PDF Link** - Direct PDF download
+                    • **Version** - Paper version (v1, v2, etc.)
+                    • **Comment** - Pages, appendix info, etc.
+                    """)
+                with info_cols[1]:
+                    st.markdown("""
+                    **🏷️ Categories & Dates:**
+                    • **Primary Category** - Main subject classification
+                    • **All Categories** - Complete category list
+                    • **Date Published** - Original publication date
+                    • **Date Updated** - Last update on ArXiv
+                    """)
+                
+                # Show preview of some papers that need updating
+                if st.checkbox("🔍 Show preview of papers to be updated", value=False):
+                    st.markdown("#### Preview (First 5 papers):")
+                    for i, (paper, missing_fields) in enumerate(papers_needing_update[:5]):
+                        with st.expander(f"📄 {paper['Title'][:60]}{'...' if len(paper['Title']) > 60 else ''}"):
+                            st.write(f"**Link:** {paper['Link']}")
+                            st.write(f"**Missing Fields:** {', '.join(missing_fields)}")
+                
+                st.markdown("---")
+                
+                # Warning about API calls
+                st.warning("""
+                ⚠️ **Important Notes:**
+                • This will make API calls to ArXiv for each paper needing updates
+                • The process respects ArXiv's API limits with delays between requests
+                • Estimated time: ~30 seconds for 10 papers
+                • Your existing data will be preserved - only missing fields will be filled
+                """)
+                
+                # Auto-fill button
+                if st.button("🚀 Start Auto-Fill Process", type="primary", use_container_width=True):
+                    with st.spinner("🔄 Auto-filling missing paper information..."):
+                        updated_count, failed_count = auto_fill_missing_paper_info()
+                    
+                    if updated_count > 0:
+                        st.success(f"🎉 Successfully updated {updated_count} papers!")
+                        st.rerun()
 
 
 if __name__ == "__main__":
