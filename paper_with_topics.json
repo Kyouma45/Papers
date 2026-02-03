@@ -1632,6 +1632,28 @@
     "Version": "2"
   },
   {
+    "Title": "Grokking: Generalization Beyond Overfitting on Small Algorithmic Datasets",
+    "Reading Status": "Read",
+    "Date Published": "2022-01-06",
+    "Link": "https://arxiv.org/abs/2201.02177",
+    "Topics": [
+      "Grokking"
+    ],
+    "Description": "In this paper we propose to study generalization of neural networks on small algorithmically generated datasets. In this setting, questions about data efficiency, memorization, generalization, and speed of learning can be studied in great detail. In some situations we show that neural networks learn through a process of \"grokking\" a pattern in the data, improving generalization performance from random chance level to perfect generalization, and that this improvement in generalization can happen well past the point of overfitting. We also study generalization as a function of dataset size and find that smaller datasets require increasing amounts of optimization for generalization. We argue that these datasets provide a fertile ground for studying a poorly understood aspect of deep learning: generalization of overparametrized neural networks beyond memorization of the finite training dataset.",
+    "Month": "2026-01",
+    "Date Read": "2026-01-25",
+    "Date Added": "2026-01-25",
+    "WeekDay": "Sunday",
+    "Week": 4,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Group Sequence Policy Optimization",
     "Reading Status": "Reading",
     "Date Published": "2025-07-24",
@@ -2587,7 +2609,9 @@
     "Topics": [
       "Nvidia",
       "Mamba",
-      "MOE"
+      "MOE",
+      "Specualtive Decoding",
+      "LatentMOE"
     ],
     "Description": "We introduce the Nemotron 3 family of models - Nano, Super, and Ultra. These models deliver strong agentic, reasoning, and conversational capabilities. The Nemotron 3 family uses a Mixture-of-Experts hybrid Mamba-Transformer architecture to provide best-in-class throughput and context lengths of up to 1M tokens. Super and Ultra models are trained with NVFP4 and incorporate LatentMoE, a novel approach that improves model quality. The two larger models also include MTP layers for faster text generation. All Nemotron 3 models are post-trained using multi-environment reinforcement learning enabling reasoning, multi-step tool use, and support granular reasoning budget control. Nano, the smallest model, outperforms comparable models in accuracy while remaining extremely cost-efficient for inference. Super is optimized for collaborative agents and high-volume workloads such as IT ticket automation. Ultra, the largest model, provides state-of-the-art accuracy and reasoning performance. Nano is released together with its technical report and this white paper, while Super and Ultra will follow in the coming months. We will openly release the model weights, pre- and post-training software, recipes, and all data for which we hold redistribution rights.",
     "Month": "2026-01",
@@ -3204,6 +3228,28 @@
     "Version": "1"
   },
   {
+    "Title": "Progress measures for grokking via mechanistic interpretability",
+    "Reading Status": "Reading",
+    "Date Published": "2023-01-12",
+    "Link": "https://arxiv.org/abs/2301.05217",
+    "Topics": [
+      "Grokking"
+    ],
+    "Description": "Neural networks often exhibit emergent behavior, where qualitatively new capabilities arise from scaling up the amount of parameters, training data, or training steps. One approach to understanding emergence is to find continuous \\textit{progress measures} that underlie the seemingly discontinuous qualitative changes. We argue that progress measures can be found via mechanistic interpretability: reverse-engineering learned behaviors into their individual components. As a case study, we investigate the recently-discovered phenomenon of ``grokking'' exhibited by small transformers trained on modular addition tasks. We fully reverse engineer the algorithm learned by these networks, which uses discrete Fourier transforms and trigonometric identities to convert addition to rotation about a circle. We confirm the algorithm by analyzing the activations and weights and by performing ablations in Fourier space. Based on this understanding, we define progress measures that allow us to study the dynamics of training and split training into three continuous phases: memorization, circuit formation, and cleanup. Our results show that grokking, rather than being a sudden shift, arises from the gradual amplification of structured mechanisms encoded in the weights, followed by the later removal of memorizing components.",
+    "Month": "2026-01",
+    "Date Read": "",
+    "Date Added": "2026-01-25",
+    "WeekDay": "Sunday",
+    "Week": 4,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Proximal Policy Optimization Algorithms",
     "Reading Status": "Reading",
     "Date Published": "2017-07-20",
@@ -3528,13 +3574,13 @@
       "RLM"
     ],
     "Description": "We study allowing large language models (LLMs) to process arbitrarily long prompts through the lens of inference-time scaling. We propose Recursive Language Models (RLMs), a general inference strategy that treats long prompts as part of an external environment and allows the LLM to programmatically examine, decompose, and recursively call itself over snippets of the prompt. We find that RLMs successfully handle inputs up to two orders of magnitude beyond model context windows and, even for shorter prompts, dramatically outperform the quality of base LLMs and common long-context scaffolds across four diverse long-context tasks, while having comparable (or cheaper) cost per query.",
-    "Month": NaN,
+    "Month": "2026-01",
     "Date Read": "",
     "Date Added": "2026-01-15",
-    "WeekDay": NaN,
-    "Week": null,
+    "WeekDay": "Thursday",
+    "Week": 3,
     "Authors": [],
-    "Date Updated": "",
+    "Date Updated": null,
     "Comment": "",
     "PDF Link": "",
     "Primary Category": "",
