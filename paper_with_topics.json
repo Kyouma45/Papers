@@ -2143,6 +2143,28 @@
     "Version": ""
   },
   {
+    "Title": "Large-scale online deanonymization with LLMs",
+    "Reading Status": "Read",
+    "Date Published": "2026-02-18",
+    "Link": "https://arxiv.org/abs/2602.16800",
+    "Topics": [
+      "Cybersecurity"
+    ],
+    "Description": "We show that large language models can be used to perform at-scale deanonymization. With full Internet access, our agent can re-identify Hacker News users and Anthropic Interviewer participants at high precision, given pseudonymous online profiles and conversations alone, matching what would take hours for a dedicated human investigator. We then design attacks for the closed-world setting. Given two databases of pseudonymous individuals, each containing unstructured text written by or about that individual, we implement a scalable attack pipeline that uses LLMs to: (1) extract identity-relevant features, (2) search for candidate matches via semantic embeddings, and (3) reason over top candidates to verify matches and reduce false positives. Compared to classical deanonymization work (e.g., on the Netflix prize) that required structured data, our approach works directly on raw user content across arbitrary platforms. We construct three datasets with known ground-truth data to evaluate our attacks. The first links Hacker News to LinkedIn profiles, using cross-platform references that appear in the profiles. Our second dataset matches users across Reddit movie discussion communities; and the third splits a single user's Reddit history in time to create two pseudonymous profiles to be matched. In each setting, LLM-based methods substantially outperform classical baselines, achieving up to 68% recall at 90% precision compared to near 0% for the best non-LLM method. Our results show that the practical obscurity protecting pseudonymous users online no longer holds and that threat models for online privacy need to be reconsidered.",
+    "Month": NaN,
+    "Date Read": "2026-04-18",
+    "Date Added": "2026-04-18",
+    "WeekDay": NaN,
+    "Week": null,
+    "Authors": [],
+    "Date Updated": "",
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Learning Transferable Visual Models From Natural Language Supervision",
     "Reading Status": "Read",
     "Date Published": "2021-02-26",
@@ -2610,7 +2632,7 @@
       "Nvidia",
       "Mamba",
       "MOE",
-      "Specualtive Decoding",
+      "Speculative Decoding",
       "LatentMOE"
     ],
     "Description": "We introduce the Nemotron 3 family of models - Nano, Super, and Ultra. These models deliver strong agentic, reasoning, and conversational capabilities. The Nemotron 3 family uses a Mixture-of-Experts hybrid Mamba-Transformer architecture to provide best-in-class throughput and context lengths of up to 1M tokens. Super and Ultra models are trained with NVFP4 and incorporate LatentMoE, a novel approach that improves model quality. The two larger models also include MTP layers for faster text generation. All Nemotron 3 models are post-trained using multi-environment reinforcement learning enabling reasoning, multi-step tool use, and support granular reasoning budget control. Nano, the smallest model, outperforms comparable models in accuracy while remaining extremely cost-efficient for inference. Super is optimized for collaborative agents and high-volume workloads such as IT ticket automation. Ultra, the largest model, provides state-of-the-art accuracy and reasoning performance. Nano is released together with its technical report and this white paper, while Super and Ultra will follow in the coming months. We will openly release the model weights, pre- and post-training software, recipes, and all data for which we hold redistribution rights.",
@@ -3229,7 +3251,7 @@
   },
   {
     "Title": "Progress measures for grokking via mechanistic interpretability",
-    "Reading Status": "Reading",
+    "Reading Status": "Read",
     "Date Published": "2023-01-12",
     "Link": "https://arxiv.org/abs/2301.05217",
     "Topics": [
@@ -3237,10 +3259,32 @@
     ],
     "Description": "Neural networks often exhibit emergent behavior, where qualitatively new capabilities arise from scaling up the amount of parameters, training data, or training steps. One approach to understanding emergence is to find continuous \\textit{progress measures} that underlie the seemingly discontinuous qualitative changes. We argue that progress measures can be found via mechanistic interpretability: reverse-engineering learned behaviors into their individual components. As a case study, we investigate the recently-discovered phenomenon of ``grokking'' exhibited by small transformers trained on modular addition tasks. We fully reverse engineer the algorithm learned by these networks, which uses discrete Fourier transforms and trigonometric identities to convert addition to rotation about a circle. We confirm the algorithm by analyzing the activations and weights and by performing ablations in Fourier space. Based on this understanding, we define progress measures that allow us to study the dynamics of training and split training into three continuous phases: memorization, circuit formation, and cleanup. Our results show that grokking, rather than being a sudden shift, arises from the gradual amplification of structured mechanisms encoded in the weights, followed by the later removal of memorizing components.",
     "Month": "2026-01",
-    "Date Read": "",
+    "Date Read": "2026-02-08",
     "Date Added": "2026-01-25",
     "WeekDay": "Sunday",
     "Week": 4,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
+    "Title": "Prompt Repetition Improves Non-Reasoning LLMs",
+    "Reading Status": "Read",
+    "Date Published": "2025-12-17",
+    "Link": "https://arxiv.org/abs/2512.14982",
+    "Topics": [
+      "Prompt Engineering"
+    ],
+    "Description": "When not using reasoning, repeating the input prompt improves performance for popular models (Gemini, GPT, Claude, and Deepseek) without increasing the number of generated tokens or latency.",
+    "Month": "2026-03",
+    "Date Read": "2026-03-01",
+    "Date Added": "2026-03-01",
+    "WeekDay": "Sunday",
+    "Week": 9,
     "Authors": [],
     "Date Updated": null,
     "Comment": "",
@@ -3433,6 +3477,29 @@
       "cs.CL"
     ],
     "Version": "1"
+  },
+  {
+    "Title": "Qwen3 Coder Technical Report",
+    "Reading Status": "Read",
+    "Date Published": "2026-02-03",
+    "Link": "https://github.com/QwenLM/Qwen3-Coder/blob/main/qwen3_coder_next_tech_report.pdf",
+    "Topics": [
+      "Coding Agent",
+      "Technical Report"
+    ],
+    "Description": "We present Qwen3-Coder-Next, an open-weight language model specialized for coding\nagents. Qwen3-Coder-Next is an 80-billion-parameter model that activates only 3 billion\nparameters during inference, enabling strong coding capability with efficient inference.\nIn this work, we explore how far strong training recipes can push the capability lim-\nits of models with small parameter footprints. To achieve this, we perform agentic\ntraining through large-scale synthesis of verifiable coding tasks paired with executable\nenvironments, allowing learning directly from environment feedback via mid-training\nand reinforcement learning. Across agent-centric benchmarks including SWE-Bench\nand Terminal-Bench, Qwen3-Coder-Next achieves competitive performance relative to\nits active parameter count. We release both base and instruction-tuned open-weight\nversions to support research and real-world coding agent development.",
+    "Month": "2026-03",
+    "Date Read": "2026-03-01",
+    "Date Added": "2026-03-01",
+    "WeekDay": "Sunday",
+    "Week": 9,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "Qwen3 Technical Report",
@@ -3657,6 +3724,28 @@
     "Version": "1"
   },
   {
+    "Title": "SWE-Universe: Scale Real-World Verifiable Environments to Millions",
+    "Reading Status": "Read",
+    "Date Published": "2026-02-02",
+    "Link": "https://arxiv.org/abs/2602.02361",
+    "Topics": [
+      "Coding Agent"
+    ],
+    "Description": "We propose SWE-Universe, a scalable and efficient framework for automatically constructing real-world software engineering (SWE) verifiable environments from GitHub pull requests (PRs). To overcome the prevalent challenges of automatic building, such as low production yield, weak verifiers, and prohibitive cost, our framework utilizes a building agent powered by an efficient custom-trained model. This agent employs iterative self-verification and in-loop hacking detection to ensure the reliable generation of high-fidelity, verifiable tasks. Using this method, we scale the number of real-world multilingual SWE environments to a million scale (807,693). We demonstrate the profound value of our environments through large-scale agentic mid-training and reinforcement learning. Finally, we applied this technique to Qwen3-Max-Thinking and achieved a score of 75.3% on SWE-Bench Verified. Our work provides both a critical resource and a robust methodology to advance the next generation of coding agents.",
+    "Month": "2026-03",
+    "Date Read": "2026-03-01",
+    "Date Added": "2026-03-01",
+    "WeekDay": "Sunday",
+    "Week": 9,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Search-R1: Training LLMs to Reason and Leverage Search Engines with Reinforcement Learning",
     "Reading Status": "Read",
     "Date Published": "2025-03-12",
@@ -3760,6 +3849,28 @@
       "cs.AI"
     ],
     "Version": "2"
+  },
+  {
+    "Title": "Speculative Speculative Decoding",
+    "Reading Status": "Read",
+    "Date Published": "2026-03-03",
+    "Link": "https://arxiv.org/abs/2603.03251",
+    "Topics": [
+      "Speculative Decoding"
+    ],
+    "Description": "Autoregressive decoding is bottlenecked by its sequential nature. Speculative decoding has become a standard way to accelerate inference by using a fast draft model to predict upcoming tokens from a slower target model, and then verifying them in parallel with a single target model forward pass. However, speculative decoding itself relies on a sequential dependence between speculation and verification. We introduce speculative speculative decoding (SSD) to parallelize these operations. While a verification is ongoing, the draft model predicts likely verification outcomes and prepares speculations pre-emptively for them. If the actual verification outcome is then in the predicted set, a speculation can be returned immediately, eliminating drafting overhead entirely. We identify three key challenges presented by speculative speculative decoding, and suggest principled methods to solve each. The result is Saguaro, an optimized SSD algorithm. Our implementation is on average 30% faster than optimized speculative decoding baselines and up to 5x faster than autoregressive decoding with open source inference engines.",
+    "Month": "2026-03",
+    "Date Read": "2026-03-28",
+    "Date Added": "2026-03-28",
+    "WeekDay": "Saturday",
+    "Week": 13,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "SpeechStew: Simply Mix All Available Speech Recognition Data to Train\n  One Large Neural Network",
@@ -4305,6 +4416,28 @@
       "cs.AI"
     ],
     "Version": "3"
+  },
+  {
+    "Title": "When Models Manipulate Manifolds: The Geometry of a Counting Task",
+    "Reading Status": "Read",
+    "Date Published": "2026-01-08",
+    "Link": "https://arxiv.org/abs/2601.04480",
+    "Topics": [
+      "Grokking"
+    ],
+    "Description": "Language models can perceive visual properties of text despite receiving only sequences of tokens-we mechanistically investigate how Claude 3.5 Haiku accomplishes one such task: linebreaking in fixed-width text. We find that character counts are represented on low-dimensional curved manifolds discretized by sparse feature families, analogous to biological place cells. Accurate predictions emerge from a sequence of geometric transformations: token lengths are accumulated into character count manifolds, attention heads twist these manifolds to estimate distance to the line boundary, and the decision to break the line is enabled by arranging estimates orthogonally to create a linear decision boundary. We validate our findings through causal interventions and discover visual illusions--character sequences that hijack the counting mechanism. Our work demonstrates the rich sensory processing of early layers, the intricacy of attention algorithms, and the importance of combining feature-based and geometric views of interpretability.",
+    "Month": "2026-02",
+    "Date Read": "2026-03-28",
+    "Date Added": "2026-02-08",
+    "WeekDay": "Sunday",
+    "Week": 6,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "WorldPM: Scaling Human Preference Modeling",
