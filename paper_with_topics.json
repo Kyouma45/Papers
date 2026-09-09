@@ -125,6 +125,30 @@
     "Version": NaN
   },
   {
+    "Title": "Attention to Mamba: A Recipe for Cross-Architecture Distillation",
+    "Reading Status": "Read",
+    "Date Published": "2026-04-01",
+    "Link": "https://arxiv.org/abs/2604.14191",
+    "Topics": [
+      "Mamba",
+      "Knowledge Distillation",
+      "Cross-Architecture Distillation"
+    ],
+    "Description": "State Space Models (SSMs) such as Mamba have become a popular alternative to Transformer models, due to their reduced memory consumption and higher throughput at generation compared to their Attention-based counterparts. On the other hand, the community has built up a considerable body of knowledge on how to train Transformers, and many pretrained Transformer models are readily available. To facilitate the adoption of SSMs while leveraging existing pretrained Transformers, we aim to identify an effective recipe to distill an Attention-based model into a Mamba-like architecture. In prior work on cross-architecture distillation, however, it has been shown that a naïve distillation procedure from Transformers to Mamba fails to preserve the original teacher performance, a limitation often overcome with hybrid solutions combining Attention and SSM blocks. The key argument from our work is that, by equipping Mamba with a principled initialization, we can recover an overall better recipe for cross-architectural distillation. To this end, we propose a principled two-stage approach: first, we distill knowledge from a traditional Transformer into a linearized version of Attention, using an adaptation of the kernel trick. Then, we distill the linearized version into an adapted Mamba model that does not use any Attention block. Overall, the distilled Mamba model is able to preserve the original Pythia-1B Transformer performance in downstream tasks, maintaining a perplexity of 14.11 close to the teacher's 13.86. To show the efficacy of our recipe, we conduct thorough ablations at 1B scale with 10B tokens varying sequence mixer architecture, scaling analysis on model sizes and total distillation tokens, and a sensitivity analysis on tokens allocation between stages.",
+    "Month": "2026-05",
+    "Date Read": "2026-05-08",
+    "Date Added": "2026-05-06",
+    "WeekDay": "Wednesday",
+    "Week": 19,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Aya 23: Open Weight Release to Further Multilingual Progress",
     "Reading Status": "Read",
     "Date Published": "2025-08-15",
@@ -257,6 +281,50 @@
     "Version": "3"
   },
   {
+    "Title": "BitNet a4.8: 4-bit Activations for 1-bit LLMs",
+    "Reading Status": "Read",
+    "Date Published": "2024-11-07",
+    "Link": "https://arxiv.org/abs/2411.04965",
+    "Topics": [
+      "BitNet"
+    ],
+    "Description": "Recent research on the 1-bit Large Language Models (LLMs), such as BitNet b1.58, presents a promising direction for reducing the inference cost of LLMs while maintaining their performance. In this work, we introduce BitNet a4.8, enabling 4-bit activations for 1-bit LLMs. BitNet a4.8 employs a hybrid quantization and sparsification strategy to mitigate the quantization errors introduced by the outlier channels. Specifically, we utilize 4-bit activations for inputs to the attention and feed-forward network layers, while sparsifying intermediate states followed with 8-bit quantization. Extensive experiments demonstrate that BitNet a4.8 achieves performance comparable to BitNet b1.58 with equivalent training costs, while being faster in inference with enabling 4-bit (INT4/FP4) kernels. Additionally, BitNet a4.8 activates only 55% of parameters and supports 3-bit KV cache, further enhancing the efficiency of large-scale LLM deployment and inference.",
+    "Month": "2026-08",
+    "Date Read": "2026-08-20",
+    "Date Added": "2026-08-20",
+    "WeekDay": "Thursday",
+    "Week": 34,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
+    "Title": "BitNet: Scaling 1-bit Transformers for Large Language Models",
+    "Reading Status": "Read",
+    "Date Published": "2023-10-17",
+    "Link": "https://arxiv.org/pdf/2310.11453",
+    "Topics": [
+      "BitNet"
+    ],
+    "Description": "The increasing size of large language models has posed challenges for deployment and raised concerns about environmental impact due to high energy consumption. In this work, we introduce BitNet, a scalable and stable 1-bit Transformer architecture designed for large language models. Specifically, we introduce BitLinear as a drop-in replacement of the this http URL layer in order to train 1-bit weights from scratch. Experimental results on language modeling show that BitNet achieves competitive performance while substantially reducing memory footprint and energy consumption, compared to state-of-the-art 8-bit quantization methods and FP16 Transformer baselines. Furthermore, BitNet exhibits a scaling law akin to full-precision Transformers, suggesting its potential for effective scaling to even larger language models while maintaining efficiency and performance benefits.",
+    "Month": "2026-08",
+    "Date Read": "2026-08-20",
+    "Date Added": "2026-08-20",
+    "WeekDay": "Thursday",
+    "Week": 34,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "ChemAgent: Self-updating Library in Large Language Models Improves Chemical Reasoning",
     "Reading Status": "Want to Read",
     "Date Published": "2025-01-11",
@@ -320,6 +388,30 @@
     "Version": "2"
   },
   {
+    "Title": "Cosmos 3: Omnimodal World Models for Physical AI",
+    "Reading Status": "Read",
+    "Date Published": "2026-06-01",
+    "Link": "https://arxiv.org/pdf/2606.02800",
+    "Topics": [
+      "World Models",
+      "Diffusion Models",
+      "Variational Autoencoders"
+    ],
+    "Description": "We introduce Cosmos 3, a family of omnimodal world models designed to jointly process and generate language, image, video, audio, and action sequences within a unified mixture-of-transformers architecture. By supporting highly flexible input-output configurations, Cosmos 3 seamlessly unifies critical modalities for Physical AI -- effectively subsuming vision-language models, video generators, world simulators, and world-action models into a single framework. Our evaluation demonstrates that Cosmos 3 establishes a new state-of-the-art across a diverse suite of understanding and generation tasks, demonstrating omnimodal world models as scalable, general-purpose backbones for embodied agents. Our post-trained Cosmos 3 models were ranked as the best open-source Text-to-Image and Image-to-Video models by Artificial Analysis, and the best policy model by RoboArena at the time the technical report was written. To accelerate open research and deployment in Physical AI, we make our code, model checkpoints, curated synthetic datasets, and evaluation benchmark available under the Linux Foundation's OpenMDW-1.1 https://openmdw.ai/license/1-1/ License at https://github.com/nvidia/cosmos}{github.com/nvidia/cosmos and https://huggingface.co/collections/nvidia/cosmos3 . The project website is available at https://research.nvidia.com/labs/cosmos-lab/cosmos3 .",
+    "Month": "2026-06",
+    "Date Read": "2026-06-22",
+    "Date Added": "2026-06-08",
+    "WeekDay": "Monday",
+    "Week": 24,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Decoding Speculative Decoding",
     "Reading Status": "Read",
     "Date Published": "2024-02-02",
@@ -347,6 +439,29 @@
       "cs.CL"
     ],
     "Version": "4"
+  },
+  {
+    "Title": "Deep Residual Learning for Image Recognition",
+    "Reading Status": "Read",
+    "Date Published": "2015-12-10",
+    "Link": "https://arxiv.org/abs/1512.03385",
+    "Topics": [
+      "Computer Vision",
+      "Residual Connections"
+    ],
+    "Description": "Deeper neural networks are more difficult to train. We present a residual learning framework to ease the training of networks that are substantially deeper than those used previously. We explicitly reformulate the layers as learning residual functions with reference to the layer inputs, instead of learning unreferenced functions. We provide comprehensive empirical evidence showing that these residual networks are easier to optimize, and can gain accuracy from considerably increased depth. On the ImageNet dataset we evaluate residual nets with a depth of up to 152 layers---8x deeper than VGG nets but still having lower complexity. An ensemble of these residual nets achieves 3.57% error on the ImageNet test set. This result won the 1st place on the ILSVRC 2015 classification task. We also present analysis on CIFAR-10 with 100 and 1000 layers.\nThe depth of representations is of central importance for many visual recognition tasks. Solely due to our extremely deep representations, we obtain a 28% relative improvement on the COCO object detection dataset. Deep residual nets are foundations of our submissions to ILSVRC & COCO 2015 competitions, where we also won the 1st places on the tasks of ImageNet detection, ImageNet localization, COCO detection, and COCO segmentation.",
+    "Month": "2026-05",
+    "Date Read": "2026-05-17",
+    "Date Added": "2026-05-16",
+    "WeekDay": "Saturday",
+    "Week": 20,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "DeepSeek-R1: Incentivizing Reasoning Capability in LLMs via Reinforcement Learning",
@@ -806,6 +921,37 @@
       "cs.AI"
     ],
     "Version": "2"
+  },
+  {
+    "Title": "DeepSeek-V4: Towards Highly Efficient Million-Token Context Intelligence",
+    "Reading Status": "Read",
+    "Date Published": "2026-05-07",
+    "Link": "https://huggingface.co/deepseek-ai/DeepSeek-V4-Pro/blob/main/DeepSeek_V4.pdf",
+    "Topics": [
+      "Technical Report",
+      "CSA",
+      "DSA",
+      "KV Caching",
+      "Sliding Window Attention",
+      "HCA",
+      "MOE",
+      "mHC",
+      "Residual Connections",
+      "Hyper Connections"
+    ],
+    "Description": "We present a preview version of DeepSeek-V4 series, including two strong Mixture-ofExperts (MoE) language models — DeepSeek-V4-Pro with 1.6T parameters (49B activated) and DeepSeek-V4-Flash with 284B parameters (13B activated) — both supporting a context length of one million tokens. DeepSeek-V4 series incorporate several key upgrades in architecture and optimization: (1) a hybrid attention architecture that combines Compressed Sparse Attention (CSA) and Heavily Compressed Attention (HCA) to improve long-context efficiency; (2) ManifoldConstrained Hyper-Connections (mHC) that enhance conventional residual connections; (3) and the Muon optimizer for faster convergence and greater training stability. We pre-train both models on more than 32T diverse and high-quality tokens, followed by a comprehensive post-training pipeline that unlocks and further enhances their capabilities. DeepSeek-V4-ProMax, the maximum reasoning effort mode of DeepSeek-V4-Pro, redefines the state-of-the-art for open models, outperforming its predecessors in core tasks. Meanwhile, DeepSeek-V4 series are highly efficient in long-context scenarios. In the one-million-token context setting, DeepSeekV4-Pro requires only 27% of single-token inference FLOPs and 10% of KV cache compared with DeepSeek-V3.2. This enables us to routinely support one-million-token contexts, thereby making long-horizon tasks and further test-time scaling more feasible. The model checkpoints are available at https://huggingface.co/collections/deepseek-ai/deepseek-v4.",
+    "Month": "2026-05",
+    "Date Read": "2026-05-16",
+    "Date Added": "2026-05-08",
+    "WeekDay": "Friday",
+    "Week": 19,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "DeepSeek-VL2: Mixture-of-Experts Vision-Language Models for Advanced Multimodal Understanding",
@@ -1442,6 +1588,30 @@
     "Version": "2"
   },
   {
+    "Title": "Gamma-World: Generative Multi-Agent World Modeling Beyond Two Players",
+    "Reading Status": "Read",
+    "Date Published": "2026-05-27",
+    "Link": "https://arxiv.org/abs/2605.28816",
+    "Topics": [
+      "World Models",
+      "Flow Matching",
+      "Sparse Hub Attention"
+    ],
+    "Description": "World models for interactive video generation have largely focused on single-agent settings, where future observations are generated from a single control signal. However, many generated environments require multi-agent interaction: multiple players, robots, or embodied agents act simultaneously within a shared space. Scaling world models to such settings requires a principled multi-agent design: agents should remain independently controllable, permutation-symmetric, and support efficient inference while maintaining consistency across time and perspectives. In this paper, we present our generative multi-agent world model for interactive simulation. It introduces Simplex Rotary Agent Encoding, a parameter-free extension of 3D RoPE that represents agents as vertices of a regular simplex in rotary angle space. This gives each agent a distinct phase while making all agents permutation-equivalent, enabling scalable agent identity without learned per-slot identities or a fixed agent ordering. To avoid dense all-to-all attention across agents, we further propose Sparse Hub Attention, where learnable hub tokens mediate token interaction across agents, reducing cross-agent attention cost from quadratic to linear in the number of agents. For real-time rollout, we distill a full-context diffusion teacher into a causal student that generates temporal blocks sequentially with KV caching, enabling action-responsive generation at 24 FPS. Experiments in multiplayer virtual environments show that our model improves video fidelity, action controllability, and inter-agent consistency over slot-based and dense-attention baselines, while generalizing from two to four players without additional training.",
+    "Month": "2026-06",
+    "Date Read": "2026-06-07",
+    "Date Added": "2026-06-07",
+    "WeekDay": "Sunday",
+    "Week": 23,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Gated Attention for Large Language Models: Non-linearity, Sparsity, and Attention-Sink-Free",
     "Reading Status": "Read",
     "Date Published": "2025-05-10",
@@ -1718,6 +1888,51 @@
     "Version": ""
   },
   {
+    "Title": "Hyper-Connections",
+    "Reading Status": "Read",
+    "Date Published": "2024-09-29",
+    "Link": "https://arxiv.org/abs/2409.19606",
+    "Topics": [
+      "Residual Connections",
+      "Hyper Connections"
+    ],
+    "Description": "We present hyper-connections, a simple yet effective method that can serve as an alternative to residual connections. This approach specifically addresses common drawbacks observed in residual connection variants, such as the seesaw effect between gradient vanishing and representation collapse. Theoretically, hyper-connections allow the network to adjust the strength of connections between features at different depths and dynamically rearrange layers. We conduct experiments focusing on the pre-training of large language models, including dense and sparse models, where hyper-connections show significant performance improvements over residual connections. Additional experiments conducted on vision tasks also demonstrate similar improvements. We anticipate that this method will be broadly applicable and beneficial across a wide range of AI problems.",
+    "Month": "2026-05",
+    "Date Read": "2026-05-17",
+    "Date Added": "2026-05-17",
+    "WeekDay": "Sunday",
+    "Week": 20,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
+    "Title": "Identity Mappings in Deep Residual Networks",
+    "Reading Status": "Read",
+    "Date Published": "2016-03-16",
+    "Link": "https://arxiv.org/abs/1603.05027",
+    "Topics": [
+      "Residual Connections"
+    ],
+    "Description": "Deep residual networks have emerged as a family of extremely deep architectures showing compelling accuracy and nice convergence behaviors. In this paper, we analyze the propagation formulations behind the residual building blocks, which suggest that the forward and backward signals can be directly propagated from one block to any other block, when using identity mappings as the skip connections and after-addition activation. A series of ablation experiments support the importance of these identity mappings. This motivates us to propose a new residual unit, which makes training easier and improves generalization. We report improved results using a 1001-layer ResNet on CIFAR-10 (4.62% error) and CIFAR-100, and a 200-layer ResNet on ImageNet. Code is available at: https://github.com/KaimingHe/resnet-1k-layers",
+    "Month": "2026-05",
+    "Date Read": "2026-05-17",
+    "Date Added": "2026-05-16",
+    "WeekDay": "Saturday",
+    "Week": 20,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
     "Title": "Image-to-Image Translation with Condotional Adversarial Networks",
     "Reading Status": "Read",
     "Date Published": "2016-11-21",
@@ -1931,6 +2146,31 @@
       "cs.AI"
     ],
     "Version": "3"
+  },
+  {
+    "Title": "Kimi K3: Open Frontier Intelligence",
+    "Reading Status": "Reading",
+    "Date Published": "2026-07-27",
+    "Link": "https://arxiv.org/abs/2607.24653",
+    "Topics": [
+      "Technical Report",
+      "Kimi",
+      "Stable LatentMOE",
+      "Kimi Delta Attention"
+    ],
+    "Description": "We introduce Kimi K3, a 2.8T parameter Mixture-of-Experts model with 104 billion activated parameters, native vision capabilities, and a 1-million-token context window. Kimi K3 is built on Kimi Delta Attention and Attention Residuals, which improve information flow across sequence length and model depth. Together with Stable LatentMoE, which effectively activates 16 of 896 routed experts per token, and refined training and data recipes, these advances yield an approximately 2.5x improvement in overall scaling efficiency over Kimi K2. Post-training highlights reinforcement learning across general, agentic, and coding domains and multiple reasoning-effort levels, enabling compositional generalization and robust long-horizon execution. At 2.8T scale, Kimi K3 is supported by infrastructure advances in multiple areas: algorithm-system co-design for KDA, perfectly balanced expert-parallel training with efficient memory management, million-token agentic RL with persistent rollout and sandbox states, and deployment innovations. Extensive evaluations show that Kimi K3 achieves frontier-level performance across long-horizon coding, agentic, knowledge, reasoning, and vision tasks. While its overall performance still trails the most powerful proprietary models, namely Claude Fable 5 and GPT-5.6 Sol, Kimi K3 consistently outperforms other open and proprietary models evaluated in our suite. We release the full Kimi K3 model weights to facilitate future research and accelerate the broader deployment and adoption of frontier intelligence.",
+    "Month": "2026-08",
+    "Date Read": "",
+    "Date Added": "2026-08-05",
+    "WeekDay": "Wednesday",
+    "Week": 32,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "Kimi k1.5: Scaling Reinforcement Learning with LLMs",
@@ -2151,13 +2391,13 @@
       "Cybersecurity"
     ],
     "Description": "We show that large language models can be used to perform at-scale deanonymization. With full Internet access, our agent can re-identify Hacker News users and Anthropic Interviewer participants at high precision, given pseudonymous online profiles and conversations alone, matching what would take hours for a dedicated human investigator. We then design attacks for the closed-world setting. Given two databases of pseudonymous individuals, each containing unstructured text written by or about that individual, we implement a scalable attack pipeline that uses LLMs to: (1) extract identity-relevant features, (2) search for candidate matches via semantic embeddings, and (3) reason over top candidates to verify matches and reduce false positives. Compared to classical deanonymization work (e.g., on the Netflix prize) that required structured data, our approach works directly on raw user content across arbitrary platforms. We construct three datasets with known ground-truth data to evaluate our attacks. The first links Hacker News to LinkedIn profiles, using cross-platform references that appear in the profiles. Our second dataset matches users across Reddit movie discussion communities; and the third splits a single user's Reddit history in time to create two pseudonymous profiles to be matched. In each setting, LLM-based methods substantially outperform classical baselines, achieving up to 68% recall at 90% precision compared to near 0% for the best non-LLM method. Our results show that the practical obscurity protecting pseudonymous users online no longer holds and that threat models for online privacy need to be reconsidered.",
-    "Month": NaN,
+    "Month": "2026-04",
     "Date Read": "2026-04-18",
     "Date Added": "2026-04-18",
-    "WeekDay": NaN,
-    "Week": null,
+    "WeekDay": "Saturday",
+    "Week": 16,
     "Authors": [],
-    "Date Updated": "",
+    "Date Updated": null,
     "Comment": "",
     "PDF Link": "",
     "Primary Category": "",
@@ -2446,6 +2686,28 @@
       "cs.LG"
     ],
     "Version": "2"
+  },
+  {
+    "Title": "Mamba-3: Improved Sequence Modeling using State Space Principles",
+    "Reading Status": "Read",
+    "Date Published": "2026-03-16",
+    "Link": "https://arxiv.org/abs/2603.15569",
+    "Topics": [
+      "Mamba"
+    ],
+    "Description": "Scaling inference-time compute has emerged as an important driver of LLM performance, making inference efficiency a central focus of model design alongside model quality. While the current Transformer-based models deliver strong model quality, their quadratic compute and linear memory make inference expensive. This has spurred the development of sub-quadratic models with reduced linear compute and constant memory requirements. However, many recent linear models trade off model quality and capability for algorithmic efficiency, failing on tasks such as state tracking. Moreover, their theoretically linear inference remains hardware-inefficient in practice. Guided by an inference-first perspective, we introduce three core methodological improvements inspired by the state space model (SSM) viewpoint of linear models. We combine: (1) a more expressive recurrence derived from SSM discretization, (2) a complex-valued state update rule that enables richer state tracking, and (3) a multi-input, multi-output (MIMO) formulation for better model performance without increasing decode latency. Together with architectural refinements, our Mamba-3 model achieves significant gains across retrieval, state-tracking, and downstream language modeling tasks. At the 1.5B scale, Mamba-3 improves average downstream accuracy by 0.6 percentage points compared to the next best model (Gated DeltaNet), with Mamba-3's MIMO variant further improving accuracy by another 1.2 points for a total 1.8 point gain. Across state-size experiments, Mamba-3 achieves comparable perplexity to Mamba-2 despite using half of its predecessor's state size. Our evaluations demonstrate Mamba-3's ability to advance the performance-efficiency Pareto frontier.",
+    "Month": "2026-05",
+    "Date Read": "2026-05-06",
+    "Date Added": "2026-05-06",
+    "WeekDay": "Wednesday",
+    "Week": 19,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "Mamba: Linear-Time Sequence Modeling with Selective State Spaces",
@@ -2797,6 +3059,28 @@
       "cs.LG"
     ],
     "Version": "3"
+  },
+  {
+    "Title": "On the Design of Qwen3.8-Next Architecture: Evaluation, Efficiency, and Training Stability",
+    "Reading Status": "Reading",
+    "Date Published": "2026-08-26",
+    "Link": "https://github.com/QwenLM/Qwen3.8-Flash-Next/blob/main/tech_report.pdf",
+    "Topics": [
+      "Qwen"
+    ],
+    "Description": "We describe the architecture and ablations of Qwen3.8-Flash-Next, a sparse mixture\nof-experts model with 125B parameters, 6B activated per token, and additional 51B\nparameters of n-gram embedding tables held off the accelerator. On fourteen pre-training\nbenchmarks the model leads the 397B-A17B predecessor on eight and trails it on the rest\nby at most 2.6points, at 1/3theactivated parameters, 1/3thetraining tokens, and roughly\n1/9the training FLOPs. Tokenmixingusesalayer-wise hybrid of GatedDeltaNet(GDN)\nand global attention, with one full-attention layer in every four; at continued-pretraining\ntime those full-attention layers are replaced by Qwen Sparse Attention (QSA), which\nscores context at micro-block granularity with a compressed lightweight indexer. The\nresidual stream is widened to four branches and read through an elementwise gate,\na design we call the Gated Residual (GR). Capacity is added outside the backbone\nby a single n-gram embedding layer whose tables are prefetched from host memory.\nWeevaluate every candidate change along three axes: loss together with downstream\nbenchmarks; the cost of the change in training, prefill and decode; and its effect on the\noptimal hyperparameters and training stability. Loss and downstream accuracy do not\nalways move together: enlarging the n-gram vocabulary lowers loss monotonically while\ndownstream accuracy saturates. The architecture and the Muon optimizer together shift\nthe optimal learning rate and batch size upwards, render batch-size warm up unnecessary,\nand substantially improve stability under stress tests. Loss, benchmarks, efficiency and\nstability form one design problem. Solved jointly, they yield are recipe that is simultaneously\nmore efficient, more capable and more stable",
+    "Month": NaN,
+    "Date Read": "",
+    "Date Added": "2026-09-03",
+    "WeekDay": NaN,
+    "Week": null,
+    "Authors": [],
+    "Date Updated": "",
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "OpenAI o1 System Card",
@@ -3355,6 +3639,51 @@
       "cs.LG"
     ],
     "Version": "1"
+  },
+  {
+    "Title": "Quantifying the Capabilities of LLMs across Scale and Precision",
+    "Reading Status": "Read",
+    "Date Published": "2024-05-06",
+    "Link": "https://arxiv.org/abs/2405.03146",
+    "Topics": [
+      "BitNet"
+    ],
+    "Description": "Scale is often attributed as one of the factors that cause an increase in the performance of LLMs, resulting in models with billion and trillion parameters. One of the limitations of such large models is the high computational requirements that limit their usage, deployment, and debugging in resource-constrained scenarios. Two commonly used alternatives to bypass these limitations are to use the smaller versions of LLMs (e.g. Llama 7B instead of Llama 70B) and lower the memory requirements by using quantization. While these approaches effectively address the limitation of resources, their impact on model performance needs thorough examination. In this study, we perform a comprehensive evaluation to investigate the effect of model scale and quantization on the performance. We experiment with two major families of open-source instruct models ranging from 7 billion to 70 billion parameters. Our extensive zero-shot experiments across various tasks including natural language understanding, reasoning, misinformation detection, and hallucination reveal that larger models generally outperform their smaller counterparts, suggesting that scale remains an important factor in enhancing performance. We found that larger models show exceptional resilience to precision reduction and can maintain high accuracy even at 4-bit quantization for numerous tasks and they serve as a better solution than using smaller models at high precision under similar memory requirements.",
+    "Month": "2026-08",
+    "Date Read": "2026-08-20",
+    "Date Added": "2026-08-20",
+    "WeekDay": "Thursday",
+    "Week": 34,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
+  },
+  {
+    "Title": "Qwen-Image-Flash: Beyond Objective Design",
+    "Reading Status": "Read",
+    "Date Published": "2026-06-02",
+    "Link": "https://arxiv.org/abs/2606.03746",
+    "Topics": [
+      "Flow Matching",
+      "Distribution Matching Distillation (DMD)"
+    ],
+    "Description": "Few-step distillation has become an effective strategy for accelerating advanced visual generative models, yet prior work has largely focused on distillation objectives. In this work, we revisit few-step distillation from a complementary perspective, focusing on the training recipe that critically shapes student performance. Using Qwen-Image-2.0 as a representative case, we systematically investigate three factors in unified text-to-image generation and instruction-guided image editing distillation: data composition, teacher guidance, and task mixture. Our empirical analysis reveals several non-obvious behaviors, which motivate the development of Qwen-Image-Flash. Overall, our results suggest that effective few-step distillation requires not only carefully designed objectives, but also principled organization of the broader training pipeline.",
+    "Month": "2026-06",
+    "Date Read": "2026-06-07",
+    "Date Added": "2026-06-07",
+    "WeekDay": "Sunday",
+    "Week": 23,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "Qwen2.5 Technical Report",
@@ -4610,6 +4939,30 @@
       "cs.CV"
     ],
     "Version": "5"
+  },
+  {
+    "Title": "mHC: Manifold-Constrained Hyper-Connections",
+    "Reading Status": "Read",
+    "Date Published": "2025-12-31",
+    "Link": "https://arxiv.org/abs/2512.24880",
+    "Topics": [
+      "Residual Connections",
+      "Hyper Connections",
+      "mHC"
+    ],
+    "Description": "Recently, studies exemplified by Hyper-Connections (HC) have extended the ubiquitous residual connection paradigm established over the past decade by expanding the residual stream width and diversifying connectivity patterns. While yielding substantial performance gains, this diversification fundamentally compromises the identity mapping property intrinsic to the residual connection, which causes severe training instability and restricted scalability, and additionally incurs notable memory access overhead. To address these challenges, we propose Manifold-Constrained Hyper-Connections (mHC), a general framework that projects the residual connection space of HC onto a specific manifold to restore the identity mapping property, while incorporating rigorous infrastructure optimization to ensure efficiency. Empirical experiments demonstrate that mHC is effective for training at scale, offering tangible performance improvements and superior scalability. We anticipate that mHC, as a flexible and practical extension of HC, will contribute to a deeper understanding of topological architecture design and suggest promising directions for the evolution of foundational models.",
+    "Month": "2026-05",
+    "Date Read": "2026-06-22",
+    "Date Added": "2026-05-17",
+    "WeekDay": "Sunday",
+    "Week": 20,
+    "Authors": [],
+    "Date Updated": null,
+    "Comment": "",
+    "PDF Link": "",
+    "Primary Category": "",
+    "All Categories": [],
+    "Version": ""
   },
   {
     "Title": "wav2vec 2.0: A Framework for Self-Supervised Learning of Speech\n  Representations",
